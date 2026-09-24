@@ -1,0 +1,9 @@
+2026-09-23 19:13:38.592 Df wifip2pd[766:902f15] [com.apple.wifip2pd:interface] Infra scan started (2.4GHz: 1 5GHz: 0)
+2026-09-23 19:13:38.765 Df wifip2pd[766:902266] [com.apple.wifip2pd:interface] Infra scan complete (duration: 173 milisegundos), status: 0)
+2026-09-23 18:15:06.492 Df airportd[499:12c5] [com.apple.WiFiManager:] Info: <airport[499]> AWDL ended
+2026-09-24 12:09:53.353 Df airportd[499:bf2bf3] [com.apple.WiFiManager:] Info: <airport[499]> AWDL started
+2026-09-23 18:34:22.170 Df wifip2pd[766:1] [com.apple.wifip2pd:interface] Infra scan complete (duration: 4 segundos), status: 0)
+2026-09-23 19:25:19.701 Df wifip2pd[766:8f0e7f] [com.apple.wifip2pd:interface] Infra scan started (2.4GHz: 0 5GHz: 24)
+2026-09-23 19:25:22.735 Df wifip2pd[766:8f0e7f] [com.apple.wifip2pd:interface] Infra scan complete (duration: 3 segundos), status: 0)
+2026-09-23 18:15:16.283 Df wifip2pd[766:1] [com.apple.wifip2pd:interface] Infra scan complete (duration: 1 segundo), status: 0)
+2026-09-23 19:13:38.593 Df airportd[499:8f6e4b] [com.apple.WiFiManager:] [corewifi] LQM-WiFi: WeightAvgLQM rssi=-39 snr=35 txRate=401033 rxRate=1200950
