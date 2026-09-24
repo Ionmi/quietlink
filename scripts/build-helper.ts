@@ -31,6 +31,7 @@ writeFileSync(`${bundle}/Contents/Info.plist`, `<?xml version="1.0" encoding="UT
   <key>CFBundleShortVersionString</key><string>${pkg.version}</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
+  <key>NSAppSleepDisabled</key><true/>
   <key>NSLocalNetworkUsageDescription</key><string>Quietlink measures latency to your router and other devices on your network to show where Wi-Fi lag comes from.</string>
 </dict></plist>
 `);

@@ -231,6 +231,7 @@ const en = {
   "s.installFailed": "The update couldn't be installed ({error}). Your current version is untouched.",
   "ui.localNetwork": "macOS isn't letting Quietlink reach your router. Turn Quietlink on in Privacy → Local Network.",
   "ui.openPrivacy": "Open settings",
+  "ui.stall": "Quietlink was slowed down by macOS for {d}",
 };
 
 export type Key = keyof typeof en;
@@ -466,6 +467,7 @@ const es: Record<Key, string> = {
   "s.installFailed": "No se pudo instalar la actualización ({error}). Tu versión actual sigue intacta.",
   "ui.localNetwork": "macOS no deja a Quietlink llegar a tu router. Activa Quietlink en Privacidad → Red local.",
   "ui.openPrivacy": "Abrir ajustes",
+  "ui.stall": "macOS frenó a Quietlink durante {d}",
 };
 
 export const strings: Record<Lang, Record<Key, string>> = { en, es };

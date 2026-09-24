@@ -56,3 +56,9 @@ No measurable difference on this run: with the Mac on 6 GHz, AWDL caused no spik
 - Unsigned rebuilds lost the Local Network grant (router probes: `EHOSTUNREACH`, errno 65) even with Quietlink enabled in Privacy → Local Network.
 - Fix: helper packaged as `Quietlink Helper.app` with `NSLocalNetworkUsageDescription`; builds signed in Electrobun's postBuild hook (before compression) with a local self-signed "Quietlink Local" identity; updates re-signed with it before install.
 - Result: router probes 9/9 replies; after a fresh rebuild and reinstall still 8/8 without re-granting.
+
+## First real League of Legends match (2026-09-24, 19:11–19:55)
+
+- Detection worked: sessions labelled "League of Legends (match)", quiet mode on for the whole match, off after the grace period.
+- Router p50 4 ms, p95 6–10 ms, 0 interruptions, loss ≤ 0.2 %; ~20 latency spikes of 0.3–0.75 s visible on both router and internet probes.
+- The warden restored AWDL 4 times (`restoredByWarden: 4`) because the app's 1 s lease renewals were delayed, most likely by App Nap while the game was fullscreen; two of the largest spikes coincide with those restores. Fixed in 0.1.5 (NSAppSleepDisabled + helper activity assertion) and stalls are now logged.

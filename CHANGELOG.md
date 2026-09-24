@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5 — 2026-09-24
+- Fix: during a fullscreen game macOS App Nap could delay lease renewals, so the warden briefly turned AirDrop back on (4 times in one real match), causing latency spikes. App Nap is now disabled for the app and helper.
+- Stalls of the app's 1-second loop are recorded and shown, to diagnose this kind of problem.
+
 ## 0.1.4 — 2026-09-24
 - Router probes work with macOS Local Network privacy: the helper is its own app bundle with a usage description, builds and installed updates are signed with a local self-signed identity so permissions survive updates, and a `/sbin/ping` fallback kicks in if access is still refused.
 - The panel explains when macOS blocks access to the router and opens the right setting.

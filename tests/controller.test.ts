@@ -475,3 +475,11 @@ test("router probes refused by macOS Local Network privacy are reported, not sho
   helper.emit({ type: "probe-result", target: "192.168.1.1", id: 1, seq: 1, ts: 1_000_103, outcome: "reply", rttMs: 3 });
   expect(ctl.view().localNetworkBlocked).toBe(false);
 });
+
+test("a late tick (app throttled) is recorded as a stall event", async () => {
+  const { ctl, advance } = setup();
+  await advance(1000);
+  await advance(6000);
+  const ev = ctl.view().lastEvents.find((e) => e.kind === "stall");
+  expect(ev?.text).toContain("6");
+});

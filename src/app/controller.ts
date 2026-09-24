@@ -30,7 +30,7 @@ export type WardenLike = {
   close(): void;
 };
 
-export type ViewEvent = { ts: number; kind: "interruption" | "restored" | "info"; text: string; durationMs?: number; resolutionMs?: number; note?: string };
+export type ViewEvent = { ts: number; kind: "interruption" | "restored" | "stall" | "info"; text: string; durationMs?: number; resolutionMs?: number; note?: string };
 
 export type AppView = {
   phase: Phase;
@@ -128,6 +128,7 @@ export class Controller {
   private session: OpenSession | null = null;
   private secondAcc = new Map<string, { count: number; sum: number; min: number; max: number; lost: number; late: number }>();
   private lastRestored = 0;
+  private lastTickMono: number | null = null;
   private lanRefused = false;
   private update: AppView["update"] = { available: null, status: "idle", checkedAt: null, install: "idle" };
   private trafficMeter = new TrafficMeter();
@@ -642,6 +643,14 @@ export class Controller {
     if (this.stopped) return;
     const now = this.now();
     const mono = this.mono();
+    // Ticks should arrive every second; a long gap means the app was throttled (App Nap)
+    // and lease renewals were late. Recorded so it can be diagnosed after a match.
+    if (this.lastTickMono !== null && mono - this.lastTickMono > 2500) {
+      const gapMs = Math.round(mono - this.lastTickMono);
+      this.events.unshift({ ts: now, kind: "stall", text: `${(gapMs / 1000).toFixed(1)} s` });
+      this.d.telemetry.addEvent({ ts: now, kind: "stall", data: { gapMs } });
+    }
+    this.lastTickMono = mono;
     this.d.helper.checkHealth();
     // Sensor freshness is tracked per sensor: probe traffic never keeps triggers alive.
     let stale = false;

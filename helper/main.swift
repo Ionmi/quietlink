@@ -2,6 +2,8 @@ import AppKit
 import Foundation
 
 setvbuf(stdout, nil, _IOLBF, 0)
+// Timers must stay on time while a fullscreen game has focus (no App Nap / timer coalescing).
+let noNap = ProcessInfo.processInfo.beginActivity(options: [.userInitiatedAllowingIdleSystemSleep, .latencyCritical], reason: "Quietlink keeps AWDL down and measures latency in real time")
 let args = CommandLine.arguments
 
 func printJSON(_ obj: Any) {

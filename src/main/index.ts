@@ -28,6 +28,8 @@ import { dispatch, type Api } from "./rpc-api";
 import pkg from "../../package.json";
 
 Utils.setDockIconVisible(false);
+// Belt and braces for App Nap on the Bun process (it reads the app's defaults domain).
+Bun.spawnSync(["/usr/bin/defaults", "write", "dev.quietlink.app", "NSAppSleepDisabled", "-bool", "YES"]);
 ensureAppSupport();
 
 const lock = acquireInstanceLock(instanceLockPath);

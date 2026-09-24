@@ -173,7 +173,7 @@
     <section class="events">
       {#if v.lastEvents.length}
         {#each v.lastEvents.slice(0, 3) as e (e.ts + e.kind)}
-          <p><span class="muted">{time(e.ts)}</span> {e.kind === "interruption" ? tr("ui.cutOf", { d: e.text }) : e.text}{#if e.note}<span class="muted"> {e.note}</span>{/if}</p>
+          <p><span class="muted">{time(e.ts)}</span> {e.kind === "interruption" ? tr("ui.cutOf", { d: e.text }) : e.kind === "stall" ? tr("ui.stall", { d: e.text }) : e.text}{#if e.note}<span class="muted"> {e.note}</span>{/if}</p>
         {/each}
       {:else}
         <p class="muted">{tr("ui.noEvents")}</p>

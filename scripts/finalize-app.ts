@@ -20,6 +20,8 @@ for (const app of apps) {
   run(["/usr/bin/plutil", "-replace", "NSLocalNetworkUsageDescription", "-string",
     "Quietlink measures latency to your router and other devices on your network to show where Wi-Fi lag comes from.", plist]);
   run(["/usr/bin/plutil", "-replace", "LSUIElement", "-bool", "YES", plist]);
+  // App Nap would stretch the 1 s lease renewals while a game is fullscreen.
+  run(["/usr/bin/plutil", "-replace", "NSAppSleepDisabled", "-bool", "YES", plist]);
   if (identity) {
     if (!signApp(app, identity)) throw new Error(`signing ${app} failed`);
     console.log(`finalized ${app} (signed with Quietlink Local)`);
