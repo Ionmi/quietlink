@@ -30,6 +30,7 @@ export type Api = {
   checkUpdates(): Promise<void>;
   openUpdate(kind: "page" | "download"): void;
   installUpdate(): Promise<{ ok: boolean; error?: string }>;
+  openLocalNetworkSettings(): void;
 };
 
 export function dispatch(api: Api, method: string, args: unknown[]) {

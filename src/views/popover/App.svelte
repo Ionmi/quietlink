@@ -130,6 +130,9 @@
     {#if v.update.available}
       <p class="alert soft">{tr("s.updateAvailable", { v: v.update.available.version })} <button class="text" onclick={() => call("installUpdate")} disabled={v.update.install !== "idle" && v.update.install !== "error"}>{v.update.install === "downloading" ? tr("s.installing") : tr("s.installShort")}</button></p>
     {/if}
+    {#if v.localNetworkBlocked}
+      <p class="alert">{tr("ui.localNetwork")} <button class="text" onclick={() => call("openLocalNetworkSettings")}>{tr("ui.openPrivacy")}</button></p>
+    {/if}
     {#if v.probesBlocked}<p class="alert">{tr("ui.probesBlocked")}</p>{/if}
     {#if v.paused}<p class="alert soft">{tr("ui.paused")} <button class="text" onclick={() => call("resume")}>{tr("resume.automation")}</button></p>{/if}
 

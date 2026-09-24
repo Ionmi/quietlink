@@ -51,6 +51,8 @@ export type AppView = {
   interruptionsLastHour: number;
   /** Every router and external probe lost while Wi-Fi is up: likely a firewall (LuLu, Little Snitch) blocking the helper. */
   probesBlocked: boolean;
+  /** macOS refuses to let the helper reach the router (Local Network privacy). */
+  localNetworkBlocked: boolean;
   /** The warden still owes a restore (e.g. a failed `up` it keeps retrying). */
   restore: { pending: boolean; error: string | null };
   /** Bytes/s the Wi-Fi interface is moving right now (not link capacity). */
@@ -126,6 +128,7 @@ export class Controller {
   private session: OpenSession | null = null;
   private secondAcc = new Map<string, { count: number; sum: number; min: number; max: number; lost: number; late: number }>();
   private lastRestored = 0;
+  private lanRefused = false;
   private update: AppView["update"] = { available: null, status: "idle", checkedAt: null, install: "idle" };
   private trafficMeter = new TrafficMeter();
   private traffic: Traffic | null = null;
@@ -597,6 +600,11 @@ export class Controller {
       case "probe-late":
       case "probe-send-failed":
         this.ledger.onEvent(e);
+        if (e.target === this.router.ipv4) {
+          // EHOSTUNREACH on send to a LAN address = Local Network permission denied.
+          if (e.type === "probe-send-failed") this.lanRefused = e.error === "errno-65";
+          else if (e.type === "probe-sent") this.lanRefused = false;
+        }
         if (e.type === "probe-result") {
           this.accumulate(e);
           if (this.pendingCollections.length) this.flushCollections();
@@ -766,6 +774,7 @@ export class Controller {
       provisional: w?.provisional ?? false,
       interruptionsLastHour: this.events.filter((e) => e.kind === "interruption" && e.ts >= since).length,
       probesBlocked: this.probesBlocked(now),
+      localNetworkBlocked: this.lanRefused,
       restore: {
         pending: !!status && !status.holding && (status.tookDown || !!status.wifiPending),
         error: status && !status.holding && (status.tookDown || status.wifiPending) ? status.lastError : null,

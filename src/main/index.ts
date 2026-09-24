@@ -143,6 +143,7 @@ const api: Api = {
   popoverHeight: (px) => setPopoverHeight(px),
   quit: () => void finish(),
   checkUpdates: () => runUpdateCheck(true),
+  openLocalNetworkSettings: () => void Utils.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork"),
   installUpdate: async () => {
     const u = controller.view().update.available;
     if (!u) return { ok: false, error: "none" };

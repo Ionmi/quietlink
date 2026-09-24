@@ -466,3 +466,12 @@ test("the latency chart covers the full 5 minutes, downsampled", async () => {
   expect(sp[0].t).toBeLessThan(t0 + 5000);
   expect(sp.some((p) => p.rtt === 90)).toBe(true); // spikes survive downsampling
 });
+
+test("router probes refused by macOS Local Network privacy are reported, not shown as loss", async () => {
+  const { ctl, helper } = setup();
+  for (let i = 0; i < 3; i++) helper.emit({ type: "probe-send-failed", target: "192.168.1.1", error: "errno-65", ts: 1_000_000 + i });
+  expect(ctl.view().localNetworkBlocked).toBe(true);
+  helper.emit({ type: "probe-sent", target: "192.168.1.1", id: 1, seq: 1, ts: 1_000_100 });
+  helper.emit({ type: "probe-result", target: "192.168.1.1", id: 1, seq: 1, ts: 1_000_103, outcome: "reply", rttMs: 3 });
+  expect(ctl.view().localNetworkBlocked).toBe(false);
+});
