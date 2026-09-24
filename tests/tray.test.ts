@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { trayState } from "../src/main/tray";
+import { trayState } from "../src/main/tray-state";
 
 const base = { phase: "inactive" as const, privilege: true, wardenHealthy: true, suppressed: false };
 test("tray state by phase and health", () => {
