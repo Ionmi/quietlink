@@ -1,0 +1,18 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install
+      - run: bunx electrobun prepare
+      - run: bun run check
+      - run: bun test
+      - run: bun scripts/build-helper.ts
+      - run: build/helper/quietlink-helper --test-warden
+      - run: bun tests/integration/warden-dryrun.ts
+      - run: QUIETLINK_CI=1 build/helper/quietlink-helper --selftest || echo "selftest needs Wi-Fi; informational on CI"
