@@ -24,6 +24,7 @@ Turning AWDL off by hand (`sudo ifconfig awdl0 down`) helps, but macOS turns it 
 - **Triggers**: game presets (League of Legends matches only, not the client), a Zoom meeting, call apps while an input device is active, any running app you pick, a manual or timed switch, and an optional "any input device running" heuristic for browser calls.
 - **Allow AirDrop for 2 min** in the middle of a session, and **Restore AirDrop now** as an emergency stop.
 - **Network monitor**: pings the router (and optionally an external host and mesh nodes) using its own ICMP prober with exact per-probe accounting. It shows ping, jitter, loss, late replies and interruptions (≥ 2 consecutive probes lost), with the live router ping in the menu bar.
+- **Menu bar**: a fixed-width item showing router ping and what your Mac is sending and receiving right now (Mb/s, upload over download). A pill marks quiet mode.
 - **Wi-Fi inspector**: band, channel, width, signal, noise and reported PHY rate, read from the current association without scanning. If you've connected on 6 GHz on this network before and are now on 5 GHz, it offers a one-click reconnect.
 - **Quiet test**: a 4-minute A/B measurement of your own network, alternating baseline and quiet mode.
 - **Sessions**: per game or call, a p50/p95/max summary, interruption count and AWDL re-enable count.
@@ -35,7 +36,7 @@ Quietlink never scans for Wi-Fi networks, because scanning is itself one of the 
 ## How it works
 
 - **Menu-bar app**: [Electrobun](https://electrobun.dev) (Bun + system WebKit) with a Svelte 5 UI. The domain logic is pure TypeScript: leases, the mode reducer, probe accounting, the Quiet test and the band advisor.
-- **`quietlink-helper`**: a small Swift binary with two modes.
+- **`quietlink-helper`**: a small Swift binary with two modes. It also draws the menu-bar item natively, so macOS tints it for light and dark menu bars.
   - **Sensor mode**: reports processes, input devices, Wi-Fi, router, sleep/wake and ICMP probes as JSON lines.
   - **Warden mode**: a user LaunchAgent and the *only* part of Quietlink that runs privileged commands. The app holds a dead-man lease on it and renews it every second. If the app crashes, hangs or is suspended, the warden turns AWDL back on within about 5 s. Its own state is persisted before every change, and it recovers after its own crashes.
 
