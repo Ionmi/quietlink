@@ -91,6 +91,7 @@ const api: Api = {
   view: () => controller.view(),
   manual: (on, durationMs) => controller.manual(on, durationMs),
   emergency: () => controller.emergency(),
+  stopNow: () => controller.stopNow(),
   reenable: () => controller.reenable(),
   airdropBreak: () => controller.airdropBreak(),
   pause: () => controller.pause(),
@@ -144,8 +145,11 @@ configureWindows((method, args) => dispatch(api, method, args));
 // tinted by macOS). The app only sends what to show and receives clicks.
 let lastSpec = "";
 let screens: { x: number; y: number; width: number; height: number }[] = [];
+let lastTrayClick = 0;
 helper.on((e) => {
   if (e.type === "tray-clicked") {
+    if (Date.now() - lastTrayClick < 250) return; // ignore double-delivery
+    lastTrayClick = Date.now();
     screens = e.screens;
     togglePopover({ x: e.x, y: e.y, width: e.width, height: e.height }, e.screens);
   } else if (e.type === "mouse-down") {

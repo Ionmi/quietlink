@@ -18,9 +18,14 @@
     return () => ro.disconnect();
   });
 
-  const quiet = $derived(v ? ["activating", "active", "grace", "airdrop-break"].includes(v.phase) : false);
+  const serverQuiet = $derived(v ? ["activating", "active", "grace", "airdrop-break"].includes(v.phase) : false);
+  // Optimistic switch: reflects the click immediately until the app state catches up (max 3 s).
+  let pending = $state<{ on: boolean; at: number } | null>(null);
+  $effect(() => {
+    if (pending && (serverQuiet === pending.on || Date.now() - pending.at > 3000)) pending = null;
+  });
+  const quiet = $derived(pending ? pending.on : serverQuiet);
   const testing = $derived(v ? ["arming-A", "A", "arming-B", "B"].includes(v.test.phase) : false);
-  const manualOn = $derived(v ? v.because.some((b) => b === tr("lease.manual") || b.startsWith(tr("lease.timed", { min: "" }).split("(")[0])) : false);
 
   const state = $derived.by(() => {
     if (!v) return { word: "…", note: "" };
@@ -39,9 +44,13 @@
   function toggle() {
     if (!v) return;
     timedOpen = false;
-    if (v.phase === "suppressed") void call("reenable");
-    else if (manualOn) void call("manual", false);
-    else if (!quiet) void call("manual", true);
+    const on = !quiet;
+    pending = { on, at: Date.now() };
+    if (!on) void call("stopNow");
+    else {
+      if (v.phase === "suppressed") void call("reenable");
+      void call("manual", true);
+    }
   }
 
   function quietFor(minutes: number) {
@@ -80,7 +89,7 @@
   const spikeCount = $derived(v ? v.sparkline.filter((p) => p.rtt !== null && p.rtt > v.testSpikeMs).length : 0);
   const lostCount = $derived(v ? v.sparkline.filter((p) => p.rtt === null).length : 0);
   const time = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const canToggle = $derived(!!v && !testing && (v.privilege || v.phase === "suppressed" || manualOn));
+  const canToggle = $derived(!!v && !testing && (v.privilege || quiet));
 </script>
 
 {#if v}
@@ -90,7 +99,7 @@
         <span class="word">{state.word}</span>
         {#if state.note}<span class="note">{state.note}</span>{/if}
       </div>
-      <button class="switch" role="switch" aria-checked={quiet} aria-label={tr("ui.quietNow")} onclick={toggle} disabled={!canToggle || (quiet && !manualOn)}>
+      <button class="switch" role="switch" aria-checked={quiet} aria-label={tr("ui.quietNow")} onclick={toggle} disabled={!canToggle}>
         <span class="knob"></span>
       </button>
     </header>
@@ -107,7 +116,6 @@
     {#if quiet}
       <div class="timed">
         {#if v.phase === "active" || v.phase === "grace"}<button class="text" onclick={() => call("airdropBreak")}>{tr("airdrop.break")}</button>{/if}
-        <button class="text amber" onclick={() => call("emergency")}>{tr("restore.airdrop")}</button>
       </div>
     {/if}
 

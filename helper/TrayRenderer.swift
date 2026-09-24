@@ -13,13 +13,15 @@ enum TrayRenderer {
 
   static func w(_ s: String, _ f: NSFont) -> CGFloat { ceil((s as NSString).size(withAttributes: [.font: f]).width) }
 
-  static let pingSlot = w("888", pingFont) + 2 + w("ms", msFont) + 10   // pill padding included
+  static let smallPingFont = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .semibold)
+  /// Room for two digits; three-digit pings (rare against a router) use a smaller font.
+  static let pingSlot = w("88", pingFont) + 2 + w("ms", msFont) + 8   // pill padding included
   static let rateSlot = w("↑", arrowFont) + 2 + w("8888", rateFont)
 
   static func width(ping: Bool, traffic: Bool) -> CGFloat {
     var x: CGFloat = 0
     if ping { x += pingSlot }
-    if ping && traffic { x += 4 }
+    if ping && traffic { x += 3 }
     if traffic { x += rateSlot }
     return max(ceil(x), 16)
   }
@@ -35,23 +37,24 @@ enum TrayRenderer {
       var x: CGFloat = 0
       if let ping {
         // Right-aligned in its slot: spare room becomes leading space, not a gap in the middle.
-        let textW = w(ping, pingFont) + 2 + w("ms", msFont)
-        let px = x + pingSlot - (textW + 10)
-        let pill = NSRect(x: px, y: 3, width: textW + 10, height: 16)
+        let pf = ping.count > 2 ? smallPingFont : pingFont
+        let textW = w(ping, pf) + 2 + w("ms", msFont)
+        let px = x + pingSlot - (textW + 8)
+        let pill = NSRect(x: px, y: 3, width: textW + 8, height: 16)
         let quiet = state == "quiet"
         if quiet {
           NSColor.black.setFill()
           NSBezierPath(roundedRect: pill, xRadius: 5, yRadius: 5).fill()
           NSGraphicsContext.current?.compositingOperation = .destinationOut
         }
-        text(ping, pingFont, at: NSPoint(x: px + 5, y: 6.5))
-        text("ms", msFont, at: NSPoint(x: px + 5 + w(ping, pingFont) + 2, y: 6.5), alpha: quiet ? 1 : 0.7)
+        text(ping, pf, at: NSPoint(x: px + 4, y: pf === pingFont ? 6.5 : 7))
+        text("ms", msFont, at: NSPoint(x: px + 4 + w(ping, pf) + 2, y: 6.5), alpha: quiet ? 1 : 0.7)
         NSGraphicsContext.current?.compositingOperation = .sourceOver
         if state == "warn" {
           NSColor.black.setFill()
           NSBezierPath(ovalIn: NSRect(x: pill.maxX - 5, y: 14, width: 5, height: 5)).fill()
         }
-        x += pingSlot + (showTraffic ? 4 : 0)
+        x += pingSlot + (showTraffic ? 3 : 0)
       } else if state != "idle" {
         NSColor.black.setFill()
         NSBezierPath(ovalIn: NSRect(x: 5, y: 8, width: 6, height: 6)).fill()
@@ -105,14 +108,14 @@ final class StatusItem: NSObject {
 
   func show(_ img: NSImage) {
     if item == nil {
-      let it = NSStatusBar.system.statusItem(withLength: img.size.width + 8)
+      let it = NSStatusBar.system.statusItem(withLength: img.size.width + 4)
       it.button?.target = self
       it.button?.action = #selector(clicked)
       it.button?.imagePosition = .imageOnly
       it.button?.setAccessibilityLabel("Quietlink")
       item = it
     }
-    if abs((item!.length) - (img.size.width + 8)) > 0.5 { item!.length = img.size.width + 8 }
+    if abs((item!.length) - (img.size.width + 4)) > 0.5 { item!.length = img.size.width + 4 }
     item!.button?.image = img
   }
 

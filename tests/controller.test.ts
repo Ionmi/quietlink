@@ -121,7 +121,8 @@ test("emergency with a manual lease → restore-now, no hold until reenable", as
   expect(warden.ops().filter((o) => o === "hold").length).toBe(holds);
   ctl.reenable();
   await ctl.idle();
-  expect(warden.ops().filter((o) => o === "hold").length).toBe(holds + 1);
+  // Restoring AirDrop cancelled the manual lease, so re-enabling does not hold again.
+  expect(warden.ops().filter((o) => o === "hold").length).toBe(holds);
 });
 
 test("sleep releases; wake rebuilds from the next snapshot", async () => {
@@ -402,4 +403,45 @@ test("[final] live ping is unavailable when the latest probe was lost or the rep
   expect(ctl.view().ping.gw).toBe(4);
   await advance(12_000);
   expect(ctl.view().ping.gw).toBeNull();
+});
+
+test("restore AirDrop also cancels manual quiet, so re-enabling does not turn it back on", async () => {
+  const { ctl, warden } = setup();
+  ctl.manual(true);
+  await ctl.idle();
+  ctl.emergency();
+  await ctl.idle();
+  ctl.reenable();
+  await ctl.idle();
+  expect(ctl.view().because).toEqual([]);
+  expect(ctl.view().phase).toBe("inactive");
+  expect(warden.ops().filter((o) => o === "hold")).toHaveLength(1);
+});
+
+test("switch off stops quiet immediately (no grace) and ignores the running game until it ends", async () => {
+  const { ctl, helper, warden, advance } = setup();
+  helper.emit(lolProc(10));
+  await ctl.idle();
+  expect(ctl.view().phase).toBe("active");
+  ctl.stopNow();
+  await ctl.idle();
+  expect(warden.ops()).toContain("release");
+  expect(["inactive", "restoring"]).toContain(ctl.view().phase);
+  helper.emit(lolProc(10));
+  await advance(1000);
+  expect(ctl.view().because).toEqual([]);
+  helper.emit({ type: "procs", procs: [] });
+  helper.emit(lolProc(11));
+  await ctl.idle();
+  expect(ctl.view().because).toEqual(["League of Legends (match)"]);
+});
+
+test("manual off releases without grace", async () => {
+  const { ctl, warden } = setup();
+  ctl.manual(true);
+  await ctl.idle();
+  ctl.manual(false);
+  await ctl.idle();
+  expect(warden.ops()).toContain("release");
+  expect(ctl.view().phase).toBe("inactive");
 });

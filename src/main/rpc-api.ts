@@ -6,6 +6,7 @@ export type Api = {
   view(): unknown;
   manual(on: boolean, durationMs?: number): void;
   emergency(): void;
+  stopNow(): void;
   reenable(): void;
   airdropBreak(): void;
   pause(): Promise<void>;

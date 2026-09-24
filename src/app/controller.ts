@@ -100,6 +100,8 @@ export class Controller {
   private wifi: WifiEvent | null = null;
   private router: { iface: string | null; ipv4: string | null; mac: string | null } = { iface: null, ipv4: null, mac: null };
   private targets = new Map<string, { name: string; intervalMs: number }>();
+  /** Trigger keys the user switched off for this run of the app/process (pid:start). */
+  private ignored = new Set<string>();
   private lastProcsAt: number;
   private lastInputAt: number;
   private stopped = false;
@@ -182,9 +184,12 @@ export class Controller {
     const now = this.mono();
     const desired = new Map<string, Lease>();
     if (!this.s.paused) {
-      for (const m of matchRules(this.s.rules, this.procs, this.inputActive))
+      const matches = matchRules(this.s.rules, this.procs, this.inputActive);
+      // Forget ignored triggers once their process is gone, so the next match counts again.
+      for (const k of this.ignored) if (!matches.some((m) => m.key === k)) this.ignored.delete(k);
+      for (const m of matches) if (!this.ignored.has(m.key))
         desired.set(m.key, { id: m.key, source: m.kind, label: m.label, since: now, sensorBound: true });
-      if (this.s.inputTrigger && this.inputActive === true)
+      if (this.s.inputTrigger && this.inputActive === true && !this.ignored.has("input"))
         desired.set("input", { id: "input", source: "input", label: this.tr("lease.input"), since: now, sensorBound: true });
     }
     let added = false;
@@ -321,11 +326,26 @@ export class Controller {
       if (durationMs) this.leases.add({ id: "timed", source: "timed", label: this.tr("lease.timed", { min: Math.round(durationMs / 60_000) }), since: this.mono(), expiresAt: this.mono() + durationMs, sensorBound: false });
       else this.leases.add({ id: "manual", source: "manual", label: this.tr("lease.manual"), since: this.mono(), sensorBound: false });
       if (this.qtRunning()) this.qtInput({ kind: "trigger-started" });
+      this.leasesChanged();
+      return;
     }
-    this.leasesChanged();
+    // Turning manual quiet off takes effect now: no grace period.
+    this.leasesChanged(0);
+    if (this.mode.phase === "grace") this.input({ kind: "tick", now: this.mono() }, 0);
+  }
+
+  /** The popover switch turned off: end quiet now and ignore currently running triggers until they end. */
+  stopNow() {
+    for (const l of this.leases.all()) if (l.sensorBound) this.ignored.add(l.id);
+    for (const l of this.leases.all()) if (l.source !== "test") this.leases.remove(l.id);
+    this.leasesChanged(0);
+    if (this.mode.phase === "grace") this.input({ kind: "tick", now: this.mono() }, 0);
   }
 
   emergency() {
+    // Restoring AirDrop cancels manual/timed quiet too; otherwise re-enabling would bring it right back.
+    this.leases.remove("manual");
+    this.leases.remove("timed");
     this.input({ kind: "emergency" });
   }
 
