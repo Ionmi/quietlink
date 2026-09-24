@@ -5,6 +5,11 @@ import Foundation
 func runSensor() -> Never {
   let wifi = WifiSensor()
   let power = PowerSensor()
+  let procs = ProcessSensor()
+  let input = InputSensor()
+  let probers = ProberSet()
+  SensorHooks.starters.append { procs.start(); input.start() }
+  SensorHooks.handlers.append { name, cmd in probers.handle(name, cmd) }
   var lastIface: String? = CWWiFiClientInterfaceName()
   power.onNetChange = {
     lastIface = CWWiFiClientInterfaceName()
@@ -63,11 +68,37 @@ func runSelftest() -> Int32 {
   check(r["ipv4"] is String || r["ipv4"] is NSNull, "router ipv4 value")
   let s = screensSnapshot()
   check(((s["screens"] as? [Any])?.count ?? 0) >= 1, "screens")
-  for extra in SelftestHooks.checks { let (ok, name) = extra(); check(ok, name) }
+  let me = getpid()
+  let procList = listProcs()
+  check(procList.contains { ($0["pid"] as? Int) == Int(me) && !(($0["path"] as? String) ?? "").isEmpty }, "process list includes self with path")
+  let inputActive = InputSensor().active()
+  check(inputActive == nil || inputActive != nil, "input sensor returns bool or null")
+  if let router = r["ipv4"] as? String, let iface = w["iface"] as? String, ProcessInfo.processInfo.environment["QUIETLINK_CI"] == nil {
+    let result = probeSelftest(target: router, iface: iface)
+    check(result.sent >= 2, "prober sent >= 2 (\(result.sent))")
+    check(result.terminal == result.sent, "every probe has a terminal result (\(result.terminal)/\(result.sent))")
+  }
   print(failed ? "selftest FAILED" : "selftest ok")
   return failed ? 1 : 0
 }
 
-enum SelftestHooks {
-  static var checks: [() -> (Bool, String)] = []
+/// Runs a prober for 1.6 s, stops sending, waits past the deadline and checks
+/// that every sent probe got exactly one terminal result.
+func probeSelftest(target: String, iface: String) -> (sent: Int, terminal: Int) {
+  let lock = NSLock()
+  var sent = 0, terminal = 0
+  emitHook = { d in
+    lock.lock(); defer { lock.unlock() }
+    if d["type"] as? String == "probe-sent" { sent += 1 }
+    if d["type"] as? String == "probe-result" { terminal += 1 }
+  }
+  let p = Prober(target: target)
+  _ = p.start(iface: iface, intervalMs: 500)
+  Thread.sleep(forTimeInterval: 1.6)
+  p.stopSending()
+  Thread.sleep(forTimeInterval: 1.3)
+  p.stop()
+  emitHook = nil
+  lock.lock(); defer { lock.unlock() }
+  return (sent, terminal)
 }

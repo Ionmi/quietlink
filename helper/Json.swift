@@ -13,8 +13,12 @@ func wallMs() -> Double {
   Date().timeIntervalSince1970 * 1000
 }
 
+/// Test hook: when set, events go here instead of stdout.
+nonisolated(unsafe) var emitHook: (([String: Any]) -> Void)?
+
 /// Writes one JSON Lines event to stdout. Adds protocol version and timestamp.
 func emit(_ dict: [String: Any]) {
+  if let hook = emitHook { hook(dict); return }
   var d = dict
   d["v"] = protocolVersion
   if d["ts"] == nil { d["ts"] = wallMs() }
