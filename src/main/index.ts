@@ -14,7 +14,7 @@ import { LogStream } from "../adapters/log-stream";
 import * as privilege from "../adapters/privilege";
 import { WARDEN_LABEL, LOGIN_LABEL, agentInstalled, installAgent, loginPlist, removeAgent, wardenPlist } from "../adapters/launch-agents";
 import { appSupport, cliSock, dbPath, ensureAppSupport, helperBinary, instanceLockPath, keyPath, settingsPath } from "../adapters/paths";
-import { configureWindows, broadcast, hidePopover, setQuitting, showSettings, togglePopover } from "./windows";
+import { configureWindows, broadcast, hidePopover, setPopoverHeight, setQuitting, showSettings, togglePopover } from "./windows";
 import { TrayController, trayState } from "./tray";
 import { dispatch, type Api } from "./rpc-api";
 import pkg from "../../package.json";
@@ -127,6 +127,7 @@ const api: Api = {
   installCli,
   openSettings: () => showSettings(),
   closePopover: () => hidePopover(),
+  popoverHeight: (px) => setPopoverHeight(px),
   quit: () => void finish(),
 };
 configureWindows((method, args) => dispatch(api, method, args));

@@ -128,6 +128,12 @@ const en = {
   "set.license": "MIT License",
   "set.working": "Working…",
   "set.failed": "Failed: {error}",
+  "ui.offNote": "AirDrop and Handoff work normally",
+  "ui.quietFor": "Quiet for…",
+  "ui.toRouter": "to your router, last 5 min",
+  "ui.factsLine": "{spikes} spikes over {ms} ms · {lost} lost",
+  "ui.cutOf": "Cut of {d}",
+  "ui.pauseShort": "Pause",
 };
 
 export type Key = keyof typeof en;
@@ -260,6 +266,12 @@ const es: Record<Key, string> = {
   "set.license": "Licencia MIT",
   "set.working": "Trabajando…",
   "set.failed": "Error: {error}",
+  "ui.offNote": "AirDrop y Handoff funcionan con normalidad",
+  "ui.quietFor": "Silenciar durante…",
+  "ui.toRouter": "al router, últimos 5 min",
+  "ui.factsLine": "{spikes} picos de más de {ms} ms · {lost} perdidos",
+  "ui.cutOf": "Corte de {d}",
+  "ui.pauseShort": "Pausar",
 };
 
 export const strings: Record<Lang, Record<Key, string>> = { en, es };

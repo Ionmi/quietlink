@@ -24,6 +24,7 @@ export type Api = {
   installCli(): Promise<{ ok: boolean; path?: string; error?: string }>;
   openSettings(): void;
   closePopover(): void;
+  popoverHeight(px: number): void;
   quit(): void;
 };
 

@@ -141,3 +141,10 @@ test("range summarizes probes sent inside a time window", () => {
   l.onEvent(sent(4, 1500)); l.onEvent(res(4, 1505, "reply", 5));
   expect(l.range("gw", 400, 1200)).toMatchObject({ sent: 2, lost: 1, replies: [40] });
 });
+
+test("series keeps losses as null in send order", () => {
+  const l = L();
+  l.onEvent(sent(2, 500)); l.onEvent(res(2, 1500, "lost"));
+  l.onEvent(sent(1, 0)); l.onEvent(res(1, 3, "reply", 3));
+  expect(l.series("gw", 0, 1000)).toEqual([{ t: 0, rtt: 3 }, { t: 500, rtt: null }]);
+});

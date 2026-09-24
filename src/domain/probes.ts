@@ -98,6 +98,14 @@ export class ProbeLedger {
     };
   }
 
+  /** Settled probes in send order for charts: rtt for replies, null for losses. */
+  series(target: string, from: number, to: number): { t: number; rtt: number | null }[] {
+    return [...this.records(target).values()]
+      .filter((r) => r.sentAt >= from && r.sentAt <= to && (r.outcome === "reply" || r.outcome === "lost"))
+      .sort((a, b) => a.sentAt - b.sentAt)
+      .map((r) => ({ t: r.sentAt, rtt: r.outcome === "reply" ? (r.rttMs ?? 0) : null }));
+  }
+
   /**
    * Runs of >= 2 consecutive deadline losses. Anything that is not a deadline loss
    * (error, unknown, paused, gap across a pause) breaks the run, so losses are

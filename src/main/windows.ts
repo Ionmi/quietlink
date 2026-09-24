@@ -1,7 +1,9 @@
 import { BrowserView, BrowserWindow } from "electrobun/main";
 import { popoverFrame, type Rect, type Screen } from "./geometry";
 
-const POPOVER = { width: 360, height: 560 };
+const POPOVER = { width: 368, height: 460 };
+let popoverHeight = POPOVER.height;
+let lastFrame: { x: number; y: number } | null = null;
 
 type Invoke = (method: string, args: unknown[]) => unknown;
 
@@ -53,6 +55,7 @@ function createPopover() {
     preload: "views://popover/index.js",
     renderer: "native",
     titleBarStyle: "hidden",
+    transparent: true,
     frame: { width: POPOVER.width, height: POPOVER.height },
     hidden: true,
     rpc,
@@ -78,13 +81,22 @@ function createPopover() {
 
 export function togglePopover(tray: Rect, screens: Screen[]) {
   const win = createPopover();
-  const f = popoverFrame(tray, screens, POPOVER);
+  const f = popoverFrame(tray, screens, { width: POPOVER.width, height: popoverHeight });
+  lastFrame = { x: f.x, y: f.y };
   win.setFrame(f.x, f.y, f.width, f.height);
   win.setAlwaysOnTop(true);
   win.setVisibleOnAllWorkspaces(true);
   shownAt = Date.now();
   win.show();
   win.activate();
+}
+
+/** The view reports its content height; the window follows (top edge fixed). */
+export function setPopoverHeight(px: number) {
+  const h = Math.round(Math.min(Math.max(px, 200), 900));
+  if (h === popoverHeight) return;
+  popoverHeight = h;
+  if (popover && lastFrame) popover.setFrame(lastFrame.x, lastFrame.y, POPOVER.width, h);
 }
 
 export function hidePopover() {

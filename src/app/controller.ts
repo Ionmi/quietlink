@@ -662,11 +662,7 @@ export class Controller {
     };
     const status = this.d.warden.lastStatus;
     const since = now - HOUR;
-    const spark: { t: number; rtt: number | null }[] = [];
-    if (gw) {
-      const rs = this.ledger.range(gw, now - 5 * 60_000, now);
-      rs.replies.slice(-300).forEach((rtt, i) => spark.push({ t: i, rtt }));
-    }
+    const spark = gw ? this.ledger.series(gw, now - 5 * 60_000, now).slice(-300) : [];
     return {
       phase: this.mode.phase,
       because: this.labels(),
