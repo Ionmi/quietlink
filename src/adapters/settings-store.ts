@@ -10,6 +10,7 @@ export type Settings = {
   externalTarget: string | null;
   extraTargets: string[];
   showPingInMenuBar: boolean;
+  showTrafficInMenuBar: boolean;
   rules: TriggerRule[];
   inputTrigger: boolean;
   explainCuts: boolean;
@@ -20,7 +21,7 @@ export type Settings = {
 
 export function defaults(lang: Lang = "en"): Settings {
   return {
-    lang, graceMs: 10_000, externalTarget: "1.1.1.1", extraTargets: [], showPingInMenuBar: true,
+    lang, graceMs: 10_000, externalTarget: "1.1.1.1", extraTargets: [], showPingInMenuBar: true, showTrafficInMenuBar: true,
     rules: loadPresets(presets), inputTrigger: false, explainCuts: false, launchAtLogin: false,
     paused: false, bandHistory: {},
   };

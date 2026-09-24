@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="36" height="36">
-  <g fill="none" stroke="#000" stroke-linecap="round" stroke-width="3">
-    <path d="M 5 14.5 A 18 18 0 0 1 31 14.5"/>
-    <path d="M 9.5 19.5 A 5.5 5.5 0 0 1 14 17.4"/>
-    <path d="M 22 17.4 A 5.5 5.5 0 0 1 26.5 19.5"/>
-    <path d="M 14 24.5 A 6 6 0 0 1 22 24.5"/>
-  </g>
-  <circle cx="18" cy="29" r="2.4" fill="#000"/>
-  <path d="M 18 15 L 18 19.5" stroke="#000" stroke-width="3" stroke-linecap="round"/>
+  <!-- Needs attention: crescent outline with a mark -->
+  <defs>
+    <mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36">
+      <rect width="36" height="36" fill="white"/>
+      <circle cx="28" cy="27" r="7" fill="black"/>
+    </mask>
+  </defs>
+  <path d="M 20 5.5 A 12.5 12.5 0 1 0 31 24 A 10 10 0 1 1 20 5.5 Z" fill="none" stroke="#000" stroke-width="2.6" stroke-linejoin="round" mask="url(#m)"/>
+  <circle cx="28" cy="27" r="4.5" fill="#000"/>
 </svg>

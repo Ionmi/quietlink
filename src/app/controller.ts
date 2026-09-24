@@ -8,6 +8,7 @@ import { ProbeLedger } from "../domain/probes";
 import { initialQT, qtReduce, type QTEffect, type QTInput, type QTState } from "../domain/quiettest";
 import { summarize, type SessionSummary } from "../domain/session";
 import { matchRules } from "../domain/triggers";
+import { TrafficMeter, type Traffic } from "../domain/menubar";
 import type { Settings, SettingsStore } from "../adapters/settings-store";
 import type { TelemetryStore } from "../adapters/telemetry-store";
 import type { HelperCommand, HelperEvent, ProcInfo, WardenResponse, WardenStatus, WifiEvent } from "../shared/protocol";
@@ -49,6 +50,8 @@ export type AppView = {
   interruptionsLastHour: number;
   /** Every router and external probe lost while Wi-Fi is up: likely a firewall (LuLu, Little Snitch) blocking the helper. */
   probesBlocked: boolean;
+  /** Bytes/s the Wi-Fi interface is moving right now (not link capacity). */
+  traffic: Traffic | null;
   advice: Advice;
   sparkline: { t: number; rtt: number | null }[];
   test: QTState;
@@ -106,6 +109,8 @@ export class Controller {
   private session: OpenSession | null = null;
   private secondAcc = new Map<string, { count: number; sum: number; min: number; max: number; lost: number; late: number }>();
   private lastRestored = 0;
+  private trafficMeter = new TrafficMeter();
+  private traffic: Traffic | null = null;
   private lastPrune = 0;
   private lastAdviceKind = "none";
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -513,6 +518,9 @@ export class Controller {
         return;
       case "net-change":
         return;
+      case "traffic":
+        this.traffic = this.trafficMeter.update(e.iface, e.rxBytes, e.txBytes, e.ts) ?? this.traffic;
+        return;
       case "probe-sent":
       case "probe-result":
       case "probe-late":
@@ -681,6 +689,7 @@ export class Controller {
       provisional: w?.provisional ?? false,
       interruptionsLastHour: this.events.filter((e) => e.kind === "interruption" && e.ts >= since).length,
       probesBlocked: this.probesBlocked(now),
+      traffic: this.wifi ? this.traffic : null,
       advice: this.advice(),
       sparkline: spark,
       test: this.qt,

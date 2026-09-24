@@ -312,3 +312,10 @@ test("interruptions are attributed by timestamp; final one counted before close"
   await advance(1000);
   expect(ctl.view().sessions[0]?.interruptions).toBe(1);
 });
+
+test("traffic events become per-second rates in the view", async () => {
+  const { ctl, helper } = setup();
+  helper.emit({ type: "traffic", iface: "en0", rxBytes: 1_000, txBytes: 100, ts: 0 });
+  helper.emit({ type: "traffic", iface: "en0", rxBytes: 2_001_000, txBytes: 50_100, ts: 1000 });
+  expect(ctl.view().traffic).toEqual({ down: 2_000_000, up: 50_000 });
+});

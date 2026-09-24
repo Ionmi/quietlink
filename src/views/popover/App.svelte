@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app, call, connect, fmt, tr } from "../shared/state.svelte";
   import Trace from "./Trace.svelte";
+  import { formatRate } from "../../domain/menubar";
 
   $effect(() => connect());
 
@@ -129,7 +130,8 @@
       <div><dt>{tr("ui.internet")}</dt><dd>{fmt(v.ping.ext)} ms</dd></div>
       <div><dt>{tr("ui.jitter")}</dt><dd>{fmt(v.jitter, 1)} ms</dd></div>
       <div><dt>{tr("ui.loss")}</dt><dd>{fmt(v.lossPct, 1)} %</dd></div>
-      <div>
+      <div class="wide"><dt>{tr("ui.traffic")}</dt><dd>{#if v.traffic}↓{formatRate(v.traffic.down)}b/s ↑{formatRate(v.traffic.up)}b/s{:else}—{/if}</dd></div>
+      <div class="wide">
         <dt>{tr("ui.wifi")}</dt>
         <dd>
           {#if v.wifi}{v.wifi.band ?? "—"} GHz, {tr("ui.channel", { n: v.wifi.channel ?? "—" })}, {fmt(v.wifi.rssi)} dBm{:else}{tr("ui.notConnected")}{/if}
@@ -224,7 +226,8 @@
 
   .rows { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
   .rows div { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--hair); padding-top: 6px; }
-  .rows div:last-child { grid-column: 1 / -1; }
+
+  .rows .wide { grid-column: 1 / -1; }
   dt { color: var(--dim); }
   dd { margin: 0; font-variant-numeric: tabular-nums; }
 

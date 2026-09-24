@@ -20,6 +20,7 @@ export type HelperEvent =
   | { v: 1; type: "router"; ts: number; iface: string | null; ipv4: string | null; mac: string | null }
   | { v: 1; type: "power"; ts: number; state: "will-sleep" | "did-wake" }
   | { v: 1; type: "net-change"; ts: number }
+  | { v: 1; type: "traffic"; ts: number; iface: string; rxBytes: number; txBytes: number }
   | { v: 1; type: "procs"; ts: number; procs: ProcInfo[] }
   | ({ v: 1; type: "proc-launch" | "proc-exit"; ts: number } & ProcInfo)
   | { v: 1; type: "input-active"; ts: number; active: boolean | null }

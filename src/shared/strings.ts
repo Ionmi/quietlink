@@ -134,6 +134,8 @@ const en = {
   "ui.factsLine": "{spikes} spikes over {ms} ms · {lost} lost",
   "ui.cutOf": "Cut of {d}",
   "ui.pauseShort": "Pause",
+  "set.menuTraffic": "Show current download/upload in the menu bar",
+  "ui.traffic": "Traffic",
 };
 
 export type Key = keyof typeof en;
@@ -272,6 +274,8 @@ const es: Record<Key, string> = {
   "ui.factsLine": "{spikes} picos de más de {ms} ms · {lost} perdidos",
   "ui.cutOf": "Corte de {d}",
   "ui.pauseShort": "Pausar",
+  "set.menuTraffic": "Mostrar bajada/subida actual en la barra de menús",
+  "ui.traffic": "Tráfico",
 };
 
 export const strings: Record<Lang, Record<Key, string>> = { en, es };

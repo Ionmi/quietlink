@@ -1,15 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="36" height="36">
-  <defs>
-    <mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36">
-      <rect width="36" height="36" fill="white"/>
-      <circle cx="28" cy="9" r="7.5" fill="black"/>
-    </mask>
-  </defs>
-  <g fill="none" stroke="#000" stroke-linecap="round" stroke-width="3.4" mask="url(#m)">
-    <path d="M 5 14.5 A 18 18 0 0 1 31 14.5"/>
-    <path d="M 9.5 19.5 A 12 12 0 0 1 26.5 19.5"/>
-    <path d="M 14 24.5 A 6 6 0 0 1 22 24.5"/>
-  </g>
-  <circle cx="18" cy="29" r="2.6" fill="#000"/>
-  <path d="M 28 3.5 A 5.5 5.5 0 1 0 33.5 10.5 A 4.4 4.4 0 1 1 28 3.5 Z" fill="#000"/>
+  <!-- Quiet mode on: filled crescent -->
+  <path d="M 20 5.5 A 12.5 12.5 0 1 0 31 24 A 10 10 0 1 1 20 5.5 Z" fill="#000" stroke="#000" stroke-width="2.6" stroke-linejoin="round"/>
 </svg>

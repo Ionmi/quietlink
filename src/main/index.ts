@@ -16,6 +16,7 @@ import { WARDEN_LABEL, LOGIN_LABEL, agentInstalled, installAgent, loginPlist, re
 import { appSupport, cliSock, dbPath, ensureAppSupport, helperBinary, instanceLockPath, keyPath, settingsPath } from "../adapters/paths";
 import { configureWindows, broadcast, hidePopover, setPopoverHeight, setQuitting, showSettings, togglePopover } from "./windows";
 import { TrayController, trayState } from "./tray";
+import { menuBarTitle } from "../domain/menubar";
 import { dispatch, type Api } from "./rpc-api";
 import pkg from "../../package.json";
 
@@ -140,7 +141,7 @@ const tray = new TrayController((bounds) => {
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 controller.onChange((v) => {
   const wantsQuiet = v.because.length > 0;
-  const title = v.settings.showPingInMenuBar && v.ping.gw !== null ? `${Math.round(v.ping.gw)} ms` : "";
+  const title = menuBarTitle(v.ping.gw, v.traffic, { ping: v.settings.showPingInMenuBar, traffic: v.settings.showTrafficInMenuBar });
   tray.update(trayState(v, wantsQuiet), title);
   if (pushTimer) return;
   pushTimer = setTimeout(() => {

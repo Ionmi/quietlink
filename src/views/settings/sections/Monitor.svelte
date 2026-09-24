@@ -28,6 +28,7 @@
 
 <h2>{tr("ui.router")}</h2>
 <label class="row"><input type="checkbox" checked={s.showPingInMenuBar} onchange={(e) => call("updateSettings", { showPingInMenuBar: e.currentTarget.checked })} /> {tr("set.menuPing")}</label>
+<label class="row"><input type="checkbox" checked={s.showTrafficInMenuBar} onchange={(e) => call("updateSettings", { showTrafficInMenuBar: e.currentTarget.checked })} /> {tr("set.menuTraffic")}</label>
 
 <h2>{tr("set.explain")}</h2>
 <label class="row"><input type="checkbox" checked={s.explainCuts} onchange={(e) => call("updateSettings", { explainCuts: e.currentTarget.checked })} /> {tr("set.explain")}</label>

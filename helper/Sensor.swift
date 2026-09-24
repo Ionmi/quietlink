@@ -8,7 +8,8 @@ func runSensor() -> Never {
   let procs = ProcessSensor()
   let input = InputSensor()
   let probers = ProberSet()
-  SensorHooks.starters.append { procs.start(); input.start() }
+  let traffic = TrafficSensor(iface: { CWWiFiClientInterfaceName() })
+  SensorHooks.starters.append { procs.start(); input.start(); traffic.start() }
   SensorHooks.handlers.append { name, cmd in probers.handle(name, cmd) }
   var lastIface: String? = CWWiFiClientInterfaceName()
   power.onNetChange = {
@@ -68,6 +69,10 @@ func runSelftest() -> Int32 {
   check(r["ipv4"] is String || r["ipv4"] is NSNull, "router ipv4 value")
   let s = screensSnapshot()
   check(((s["screens"] as? [Any])?.count ?? 0) >= 1, "screens")
+  if let name = w["iface"] as? String {
+    let a = interfaceBytes(name)
+    check(a != nil && a!.rx > 0, "traffic counters readable for \(name)")
+  }
   let procList = listProcs()
   check(procList.contains { (($0["path"] as? String) ?? "").hasSuffix("Finder.app/Contents/MacOS/Finder") }, "process list includes Finder")
   check(procList.allSatisfy { (($0["start"] as? Double) ?? 0) > 0 && (($0["path"] as? String) ?? "").contains(".app/") }, "process entries have start time and bundle path")
