@@ -9,12 +9,13 @@
 </script>
 
 <div class="hero">
-  <svg viewBox="0 0 1024 1024" width="72" height="72" aria-hidden="true">
-    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12355a" /><stop offset="1" stop-color="#0e7c86" /></linearGradient></defs>
-    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#g)" />
-    <g fill="none" stroke="#fff" stroke-linecap="round" stroke-width="66"><path d="M305 538a270 270 0 0 1 414 0" /><path d="M397 616a150 150 0 0 1 230 0" /></g>
-    <circle cx="512" cy="712" r="46" fill="#fff" />
-    <path d="M770 232a120 120 0 1 0 112 163 96 96 0 1 1-112-163z" fill="#9ff3e6" />
+  <svg viewBox="100 100 824 824" width="72" height="72" aria-hidden="true">
+        <defs>
+          <linearGradient id="ab" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b2a4a" /><stop offset="1" stop-color="#0c1426" /></linearGradient>
+          <linearGradient id="abl" x1="200" y1="0" x2="824" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity="0.35" /><stop offset="0.45" stop-color="#fff" /><stop offset="0.8" stop-color="#6aa8ff" /><stop offset="1" stop-color="#3b82f6" /></linearGradient>
+        </defs>
+        <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#ab)" />
+        <path d="M200 600 L300 600 L350 330 L410 700 L455 520 L490 600 L824 600" fill="none" stroke="url(#abl)" stroke-width="62" stroke-linecap="round" stroke-linejoin="round" />
   </svg>
   <div>
     <h1 class="page-title">Quietlink</h1>

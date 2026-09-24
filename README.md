@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/notes/icons-preview.png" width="520" alt="Quietlink icons"></p>
+<p align="center"><img src="docs/notes/icons-preview.png" width="128" alt="Quietlink icon"></p>
 
 # Quietlink
 

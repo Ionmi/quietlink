@@ -19,7 +19,6 @@ export default {
       "dist/views/settings/index.html": "views/settings/index.html",
       "dist/views/settings/assets": "views/settings/assets",
       "build/helper/quietlink-helper": "helper/quietlink-helper",
-      "build/tray": "views/tray",
       "src/shared/presets.json": "presets.json",
       "bin/quietlink": "bin/quietlink",
     },

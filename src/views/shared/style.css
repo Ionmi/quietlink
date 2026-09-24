@@ -2,10 +2,10 @@
   color-scheme: light dark;
   font: 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
   --bg: #f5f6f8; --panel: #ffffff; --chip: #e9ecf1; --line: #d9dde4; --text: #1b1f27; --muted: #69707d;
-  --accent: #0e7c86; --warn: #c2410c; --danger: #b42318;
+  --accent: #2563eb; --warn: #c2410c; --danger: #b42318;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #16191f; --panel: #1f232b; --chip: #2a2f38; --line: #353b46; --text: #e8ebf0; --muted: #9aa2af; --accent: #19a7b3; --warn: #ea7a3f; --danger: #f0605a; }
+  :root { --bg: #16191f; --panel: #1f232b; --chip: #2a2f38; --line: #353b46; --text: #e8ebf0; --muted: #9aa2af; --accent: #3b82f6; --warn: #ea7a3f; --danger: #f0605a; }
 }
 * { box-sizing: border-box; }
 :root { accent-color: var(--accent); }

@@ -191,7 +191,7 @@
   :global(html), :global(body) { background: transparent !important; overflow: hidden; }
   main {
     --panel: #0f1d2b; --ink: #e6eef2; --dim: #8aa0ad; --hair: rgba(230, 238, 242, 0.12);
-    --teal: #2bb5b0; --mint: #9ff3e6; --amber: #f2a541; --line-color: var(--dim);
+    --teal: #3b82f6; --mint: #8ec5ff; --amber: #f2a541; --line-color: var(--dim);
     margin: 1px; padding: 14px 16px 10px; border-radius: 14px;
     background: var(--panel); color: var(--ink); border: 1px solid var(--hair);
     display: flex; flex-direction: column; gap: 12px;
@@ -199,7 +199,7 @@
   }
   main.quiet { --line-color: var(--mint); }
   @media (prefers-color-scheme: light) {
-    main { --panel: #f3f7f8; --ink: #11222f; --dim: #5d7280; --hair: rgba(17, 34, 47, 0.12); --teal: #0e7c86; --mint: #0e7c86; --amber: #c9761a; }
+    main { --panel: #f3f7f8; --ink: #11222f; --dim: #5d7280; --hair: rgba(17, 34, 47, 0.12); --teal: #2563eb; --mint: #2563eb; --amber: #c9761a; }
   }
 
   header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
