@@ -4,7 +4,9 @@
   "type": "module",
   "private": true,
   "license": "MIT",
-  "engines": { "bun": ">=1.4.2" },
+  "engines": {
+    "bun": ">=1.4.2"
+  },
   "scripts": {
     "build:helper": "bun scripts/build-helper.ts",
     "build:views": "QUIETLINK_VIEW=popover vite build && QUIETLINK_VIEW=settings vite build",
@@ -13,7 +15,8 @@
     "dev": "bun run build && bun run start",
     "check": "tsc --noEmit",
     "test": "bun test tests",
-    "test:helper": "bun scripts/build-helper.ts && build/helper/quietlink-helper --test-warden && build/helper/quietlink-helper --selftest"
+    "test:helper": "bun scripts/build-helper.ts && build/helper/quietlink-helper --test-warden && build/helper/quietlink-helper --selftest",
+    "test:integration": "bun scripts/build-helper.ts && bun tests/integration/warden-dryrun.ts"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "7.3.0",
