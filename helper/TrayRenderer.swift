@@ -6,16 +6,17 @@ import AppKit
 /// shown, never on the numbers.
 enum TrayRenderer {
   static let height: CGFloat = 22
+  // Same weight and sizes as the system's own menu-bar text, so the item blends in.
   static let pingFont = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
-  static let msFont = NSFont.systemFont(ofSize: 9.5, weight: .semibold)
-  static let rateFont = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .semibold)
-  static let arrowFont = NSFont.systemFont(ofSize: 8, weight: .bold)
+  static let msFont = NSFont.systemFont(ofSize: 10, weight: .medium)
+  static let rateFont = NSFont.monospacedDigitSystemFont(ofSize: 9.5, weight: .semibold)
+  static let arrowFont = NSFont.systemFont(ofSize: 7.5, weight: .semibold)
 
   static func w(_ s: String, _ f: NSFont) -> CGFloat { ceil((s as NSString).size(withAttributes: [.font: f]).width) }
 
   static let smallPingFont = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .semibold)
   /// Room for two digits; three-digit pings (rare against a router) use a smaller font.
-  static let pingSlot = w("88", pingFont) + 2 + w("ms", msFont) + 8   // pill padding included
+  static let pingSlot = max(w("88", pingFont), w("888", smallPingFont)) + 1.5 + w("ms", msFont) + 8   // pill padding included
   static let rateSlot = w("↑", arrowFont) + 2 + w("8888", rateFont)
 
   static func width(ping: Bool, traffic: Bool) -> CGFloat {
@@ -38,18 +39,17 @@ enum TrayRenderer {
       if let ping {
         // Right-aligned in its slot: spare room becomes leading space, not a gap in the middle.
         let pf = ping.count > 2 ? smallPingFont : pingFont
-        let textW = w(ping, pf) + 2 + w("ms", msFont)
+        let textW = w(ping, pf) + 1.5 + w("ms", msFont)
         let px = x + pingSlot - (textW + 8)
         let pill = NSRect(x: px, y: 3, width: textW + 8, height: 16)
         let quiet = state == "quiet"
         if quiet {
-          NSColor.black.setFill()
-          NSBezierPath(roundedRect: pill, xRadius: 5, yRadius: 5).fill()
-          NSGraphicsContext.current?.compositingOperation = .destinationOut
+          // A soft translucent pill, like a highlighted menu-bar item.
+          NSColor.black.withAlphaComponent(0.22).setFill()
+          NSBezierPath(roundedRect: pill, xRadius: 4, yRadius: 4).fill()
         }
         text(ping, pf, at: NSPoint(x: px + 4, y: pf === pingFont ? 6.5 : 7))
-        text("ms", msFont, at: NSPoint(x: px + 4 + w(ping, pf) + 2, y: 6.5), alpha: quiet ? 1 : 0.7)
-        NSGraphicsContext.current?.compositingOperation = .sourceOver
+        text("ms", msFont, at: NSPoint(x: px + 4 + w(ping, pf) + 1.5, y: 6.5), alpha: 0.85)
         if state == "warn" {
           NSColor.black.setFill()
           NSBezierPath(ovalIn: NSRect(x: pill.maxX - 5, y: 14, width: 5, height: 5)).fill()
@@ -64,9 +64,9 @@ enum TrayRenderer {
         let right = x + rateSlot
         let aw = w("↑", arrowFont) + 1.5
         text(up, rateFont, at: NSPoint(x: right - w(up, rateFont), y: 12))
-        text("↑", arrowFont, at: NSPoint(x: right - w(up, rateFont) - aw, y: 12.5), alpha: 0.6)
+        text("↑", arrowFont, at: NSPoint(x: right - w(up, rateFont) - aw, y: 12.5), alpha: 0.8)
         text(down, rateFont, at: NSPoint(x: right - w(down, rateFont), y: 1.5))
-        text("↓", arrowFont, at: NSPoint(x: right - w(down, rateFont) - aw, y: 2), alpha: 0.6)
+        text("↓", arrowFont, at: NSPoint(x: right - w(down, rateFont) - aw, y: 2), alpha: 0.8)
       }
       return true
     }
