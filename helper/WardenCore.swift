@@ -39,7 +39,11 @@ struct WardenPersisted: Codable, Equatable {
 struct WardenCore {
   private(set) var persisted = WardenPersisted(bootId: "", tookDown: false, pendingWifiOn: nil)
   private(set) var recovering = true
-  private(set) var epoch = 0
+  /// Tokens are unique across warden restarts, so an old client's token never matches a new lease.
+  private(set) var epoch = Int.random(in: 1_000_000...1_000_000_000)
+  private(set) var ttl: Double = 4000
+  /// True while an `up` has been issued but not yet confirmed; no new lease until it resolves.
+  private(set) var restorePending = false
   private(set) var token: Int?
   private(set) var leaseUntil: Double = 0
   private(set) var restoredByWarden = 0
@@ -48,6 +52,14 @@ struct WardenCore {
 
   var holding: Bool { token != nil }
 
+  /// Loads durable intent before any handler (socket, SIGTERM) can run.
+  mutating func load(_ state: WardenPersisted) {
+    persisted = state
+    recovering = true
+  }
+
+  func leaseValid(now: Double) -> Bool { token != nil && now <= leaseUntil }
+
   mutating func startup(state: WardenPersisted, bootId: String, now: Double) -> [WardenCommand] {
     recovering = true
     var s = state
@@ -55,14 +67,14 @@ struct WardenCore {
     if s.bootId != bootId {
       s.tookDown = false  // AWDL is up after boot; Wi-Fi power may not be.
     } else if s.tookDown {
-      cmds.append(.up)
-      s.tookDown = false
+      cmds.append(.up)  // tookDown stays true until the restore is confirmed
+      restorePending = true
     }
     if let iface = s.pendingWifiOn { cmds.append(.wifiOn(iface)) }
     s.bootId = bootId
     persisted = s
     recoveryIntent = cmds
-    if !cmds.isEmpty || state.bootId != bootId { cmds.append(.persist) }
+    if state.bootId != bootId { cmds.append(.persist) }
     return cmds
   }
 
@@ -76,10 +88,23 @@ struct WardenCore {
     return cmds
   }
 
-  mutating func finishRecovery() -> [WardenCommand] {
+  /// Recovery ends only when every restore it intended is observed done.
+  mutating func finishRecovery(awdlUp: Bool? = nil, wifiOn: Bool? = nil) -> Bool {
+    for c in recoveryIntent {
+      if c == .up, awdlUp != true { return false }
+      if case .wifiOn = c, wifiOn != true { return false }
+    }
     recovering = false
     recoveryIntent = []
-    return []
+    return true
+  }
+
+  /// `up` succeeded and was observed: the warden no longer owes a restore.
+  mutating func restoreConfirmed() -> [WardenCommand] {
+    guard restorePending || persisted.tookDown else { return [] }
+    restorePending = false
+    persisted.tookDown = false
+    return [.persist]
   }
 
   mutating func handle(_ req: WardenRequest, now: Double, awdlUp: Bool?) -> (WardenReply, [WardenCommand]) {
@@ -88,13 +113,14 @@ struct WardenCore {
     switch req {
     case .ping, .status:
       return (ok, [])
-    case .hold(_, let ttl):
+    case .hold(_, let requested):
       if recovering { return fail("recovering") }
-      if holding { return fail("busy") }
+      if holding || restorePending || persisted.pendingWifiOn != nil { return fail("busy") }
       guard let up = awdlUp else { return fail("command-failed") }
       epoch += 1
       token = epoch
-      leaseUntil = now + ttl
+      ttl = requested
+      leaseUntil = now + requested
       var r = ok
       r.token = epoch
       if up {
@@ -104,16 +130,17 @@ struct WardenCore {
       return (r, [])
     case .renew(_, let t):
       guard let cur = token, cur == t, now <= leaseUntil else { return fail("lease-expired") }
-      leaseUntil = max(leaseUntil, now + 4000)
+      leaseUntil = max(leaseUntil, now + ttl)
       return (ok, [])
     case .release(_, let t):
       guard let cur = token, cur == t else { return fail("lease-expired") }
       return (ok, endLease())
     case .restoreNow:
+      if recovering { return fail("recovering") }
       return (ok, endLease())
     case .reconnectWifi(_, let iface):
       if recovering { return fail("recovering") }
-      if holding { return fail("busy") }
+      if holding || restorePending || persisted.pendingWifiOn != nil { return fail("busy") }
       persisted.pendingWifiOn = iface
       return (ok, [.persist, .wifiOff(iface)])
     }
@@ -126,7 +153,7 @@ struct WardenCore {
       if persisted.tookDown { restoredByWarden += 1 }
       return endLease()
     }
-    if awdlUp == true, persisted.tookDown {
+    if awdlUp == true, persisted.tookDown, !restorePending {
       reenables += 1
       return [.down]
     }
@@ -141,9 +168,9 @@ struct WardenCore {
 
   /// SIGTERM/logout: restore everything the warden changed.
   mutating func shutdown() -> [WardenCommand] {
-    var cmds = endLease().filter { $0 != .persist }
+    var cmds = endLease()
+    if persisted.tookDown, !cmds.contains(.up) { cmds.append(.up) }
     if let iface = persisted.pendingWifiOn { cmds.append(.wifiOn(iface)) }
-    cmds.append(.persist)
     return cmds
   }
 
@@ -151,9 +178,9 @@ struct WardenCore {
     token = nil
     leaseUntil = 0
     if persisted.tookDown {
-      persisted.tookDown = false
-      return [.up, .persist]
+      restorePending = true
+      return [.up]
     }
-    return [.persist]
+    return []
   }
 }

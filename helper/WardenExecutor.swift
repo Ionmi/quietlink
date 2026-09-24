@@ -27,7 +27,13 @@ final class WardenExecutor {
     }
   }
 
-  /// Returns true on exit status 0 within the timeout.
+  var busy: Bool {
+    admission.lock(); defer { admission.unlock() }
+    return running != nil
+  }
+
+  /// Returns true on exit status 0 within the timeout. Refuses to start while a
+  /// previous command is still alive, so commands never overlap.
   func run(_ c: WardenCommand, timeout: TimeInterval = 2) -> Bool {
     guard let args = argv(c) else { return true }
     if dryRun {
@@ -44,28 +50,37 @@ final class WardenExecutor {
     let done = DispatchSemaphore(value: 0)
     p.terminationHandler = { _ in done.signal() }
     admission.lock()
-    if fenced { admission.unlock(); return false }
+    if fenced || running != nil { admission.unlock(); return false }
     do { try p.run() } catch { admission.unlock(); return false }
     running = p
     admission.unlock()
-    let finished = done.wait(timeout: .now() + timeout) == .success
+    var finished = done.wait(timeout: .now() + timeout) == .success
     if !finished {
-      p.terminate()  // SIGTERM to sudo, which relays to its child
-      _ = done.wait(timeout: .now() + 1)
+      p.terminate()
+      finished = done.wait(timeout: .now() + 1) == .success
+      if !finished {
+        kill(p.processIdentifier, SIGKILL)
+        finished = done.wait(timeout: .now() + 1) == .success
+      }
+      // The root grandchild may outlive sudo; wait until it is gone before admitting more.
+      let deadline = Date().addingTimeInterval(3)
+      while commandProcessesVisible() != false, Date() < deadline { usleep(50_000) }
+      admission.lock(); if !p.isRunning { running = nil }; admission.unlock()
+      return false
     }
     admission.lock(); running = nil; admission.unlock()
-    return finished && p.terminationStatus == 0
+    return p.terminationStatus == 0
   }
 
-  /// Hang watchdog: stop admitting commands and wait for the in-flight one.
+  /// Hang watchdog: stop admitting commands, then wait for the in-flight one and
+  /// any visible privileged descendant.
   func fence(wait: TimeInterval) {
-    if admission.lock(before: Date().addingTimeInterval(1)) {
-      fenced = true
-      let p = running
-      admission.unlock()
-      let deadline = Date().addingTimeInterval(wait)
-      while let p, p.isRunning, Date() < deadline { usleep(50_000) }
-    }
+    admission.lock()
+    fenced = true
+    let p = running
+    admission.unlock()
+    let deadline = Date().addingTimeInterval(wait)
+    while Date() < deadline, (p?.isRunning ?? false) || commandProcessesVisible() == true { usleep(50_000) }
   }
 
   func awdlUp() -> Bool? {
@@ -81,8 +96,9 @@ final class WardenExecutor {
     return nil
   }
 
-  func wifiPowerOn() -> Bool? {
-    CWWiFiClient.shared().interface()?.powerOn()
+  func wifiPowerOn(_ iface: String? = nil) -> Bool? {
+    let client = CWWiFiClient.shared()
+    return (iface.flatMap { client.interface(withName: $0) } ?? client.interface())?.powerOn()
   }
 
   func hasPrivilege() -> Bool {
@@ -94,8 +110,9 @@ final class WardenExecutor {
     p.standardOutput = pipe
     p.standardError = FileHandle.nullDevice
     guard (try? p.run()) != nil else { return false }
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
     p.waitUntilExit()
-    let out = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    let out = String(decoding: data, as: UTF8.self)
     return out.contains("/sbin/ifconfig awdl0 down") && out.contains("/sbin/ifconfig awdl0 up")
   }
 }

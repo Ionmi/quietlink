@@ -24,16 +24,29 @@ enum WardenStateStore {
     return s
   }
 
-  /// fsync + atomic rename so a crash never leaves a half-written record.
-  static func save(_ s: WardenPersisted) {
-    guard let data = try? JSONEncoder().encode(s) else { return }
+  /// Complete write + fsync + atomic rename + directory fsync. Returns false on any
+  /// failure; callers must not change AWDL or Wi-Fi state without durable intent.
+  @discardableResult
+  static func save(_ s: WardenPersisted) -> Bool {
+    guard let data = try? JSONEncoder().encode(s) else { return false }
     let tmp = Paths.wardenState.path + ".tmp"
     let fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0o600)
-    guard fd >= 0 else { return }
-    _ = data.withUnsafeBytes { write(fd, $0.baseAddress, data.count) }
-    fsync(fd)
+    guard fd >= 0 else { return false }
+    var off = 0
+    let ok = data.withUnsafeBytes { buf -> Bool in
+      while off < data.count {
+        let n = write(fd, buf.baseAddress! + off, data.count - off)
+        if n <= 0 { return false }
+        off += n
+      }
+      return true
+    }
+    guard ok, fsync(fd) == 0 else { close(fd); return false }
     close(fd)
-    rename(tmp, Paths.wardenState.path)
+    guard rename(tmp, Paths.wardenState.path) == 0 else { return false }
+    let dfd = open(Paths.support.path, O_RDONLY)
+    if dfd >= 0 { fsync(dfd); close(dfd) }
+    return true
   }
 }
 
