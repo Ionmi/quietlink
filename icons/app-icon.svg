@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Quietlink: a Wi-Fi glyph whose outer arc is hushed by a crescent. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12355a"/>
+      <stop offset="1" stop-color="#0e7c86"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.15" r="0.75">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="hush" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="white"/>
+      <circle cx="770" cy="352" r="150" fill="black"/>
+    </mask>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#glow)"/>
+  <g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-width="66">
+    <path d="M 213 461 A 390 390 0 0 1 811 461" mask="url(#hush)"/>
+    <path d="M 305 538 A 270 270 0 0 1 719 538"/>
+    <path d="M 397 616 A 150 150 0 0 1 627 616"/>
+  </g>
+  <circle cx="512" cy="712" r="46" fill="#ffffff"/>
+  <path d="M 770 232 A 120 120 0 1 0 882 395 A 96 96 0 1 1 770 232 Z" fill="#9ff3e6"/>
+</svg>
