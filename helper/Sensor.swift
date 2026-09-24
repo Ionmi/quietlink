@@ -68,9 +68,9 @@ func runSelftest() -> Int32 {
   check(r["ipv4"] is String || r["ipv4"] is NSNull, "router ipv4 value")
   let s = screensSnapshot()
   check(((s["screens"] as? [Any])?.count ?? 0) >= 1, "screens")
-  let me = getpid()
   let procList = listProcs()
-  check(procList.contains { ($0["pid"] as? Int) == Int(me) && !(($0["path"] as? String) ?? "").isEmpty }, "process list includes self with path")
+  check(procList.contains { (($0["path"] as? String) ?? "").hasSuffix("Finder.app/Contents/MacOS/Finder") }, "process list includes Finder")
+  check(procList.allSatisfy { (($0["start"] as? Double) ?? 0) > 0 && (($0["path"] as? String) ?? "").contains(".app/") }, "process entries have start time and bundle path")
   let inputActive = InputSensor().active()
   check(inputActive == nil || inputActive != nil, "input sensor returns bool or null")
   if let router = r["ipv4"] as? String, let iface = w["iface"] as? String, ProcessInfo.processInfo.environment["QUIETLINK_CI"] == nil {
