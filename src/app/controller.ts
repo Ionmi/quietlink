@@ -47,6 +47,8 @@ export type AppView = {
   late: number;
   provisional: boolean;
   interruptionsLastHour: number;
+  /** Every router and external probe lost while Wi-Fi is up: likely a firewall (LuLu, Little Snitch) blocking the helper. */
+  probesBlocked: boolean;
   advice: Advice;
   sparkline: { t: number; rtt: number | null }[];
   test: QTState;
@@ -323,6 +325,27 @@ export class Controller {
     return r.ok ? { ok: true } : { ok: false, error: r.error };
   }
 
+  /** Running app bundles, for the "add app" picker. */
+  runningApps(): { name: string; path: string; bundle: string }[] {
+    const seen = new Map<string, { name: string; path: string; bundle: string }>();
+    for (const p of this.procs) {
+      const i = p.path.indexOf(".app/");
+      if (i < 0) continue;
+      const bundle = p.path.slice(0, i + 4);
+      if (seen.has(p.path)) continue;
+      seen.set(p.path, { name: bundle.split("/").pop()!.replace(/\.app$/, ""), path: p.path, bundle });
+    }
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  clearData() {
+    this.d.telemetry.clearAll();
+    this.events = [];
+    this.seenInterruptions.clear();
+    this.d.settings.update({ bandHistory: {} });
+    this.changed();
+  }
+
   startQuietTest() {
     this.qtInput({ kind: "start", now: this.now(), activeLeases: this.leases.active(this.now()).length, inGrace: this.mode.phase === "grace", wifi: this.fingerprint() });
   }
@@ -560,6 +583,15 @@ export class Controller {
     }
   }
 
+  private probesBlocked(now: number) {
+    const dead = (target: string | null) => {
+      if (!target) return true;
+      const w = this.ledger.window(target, now);
+      return w.sent >= 5 && w.replies.length === 0;
+    };
+    return !!this.wifi && !!this.router.ipv4 && dead(this.router.ipv4) && (!this.s.externalTarget || dead(this.s.externalTarget));
+  }
+
   private checkAdvice() {
     const a = this.advice();
     if (a.kind === "previously-6" && this.lastAdviceKind !== a.kind && this.policy.allow("band", this.now()))
@@ -620,6 +652,7 @@ export class Controller {
       late: w?.late ?? 0,
       provisional: w?.provisional ?? false,
       interruptionsLastHour: this.events.filter((e) => e.kind === "interruption" && e.ts >= since).length,
+      probesBlocked: this.probesBlocked(now),
       advice: this.advice(),
       sparkline: spark,
       test: this.qt,

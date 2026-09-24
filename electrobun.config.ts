@@ -21,6 +21,7 @@ export default {
       "build/helper/quietlink-helper": "helper/quietlink-helper",
       "build/tray": "views/tray",
       "src/shared/presets.json": "presets.json",
+      "bin/quietlink": "bin/quietlink",
     },
     buildFolder: "build/electrobun",
     artifactFolder: "build/electrobun-artifacts",

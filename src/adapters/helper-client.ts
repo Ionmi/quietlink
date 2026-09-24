@@ -28,6 +28,9 @@ function bunSpawn(argv: string[]): ChildLike {
   };
 }
 
+// QUIETLINK_TRACE=<file> appends every raw helper line (debugging only).
+const trace = process.env.QUIETLINK_TRACE ? Bun.file(process.env.QUIETLINK_TRACE).writer() : null;
+
 /** Supervises the sensor helper: JSON Lines in, commands out, restart on exit or hang. */
 export class HelperClient {
   private child: ChildLike | null = null;
@@ -104,6 +107,7 @@ export class HelperClient {
         const line = buf.slice(0, i).trim();
         buf = buf.slice(i + 1);
         if (!line) continue;
+        if (trace) trace.write(line + "\n");
         let e: HelperEvent;
         try { e = JSON.parse(line); } catch { continue; }
         if ((e as { v?: number }).v !== PROTOCOL_VERSION) continue;

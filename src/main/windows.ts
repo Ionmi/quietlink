@@ -1,23 +1,52 @@
-import { BrowserWindow } from "electrobun/main";
+import { BrowserView, BrowserWindow } from "electrobun/main";
 import { popoverFrame, type Rect, type Screen } from "./geometry";
-const POPOVER = { width: 340, height: 460 };
+
+const POPOVER = { width: 360, height: 560 };
+
+type Invoke = (method: string, args: unknown[]) => unknown;
 
 let popover: BrowserWindow<any> | null = null;
 let settings: BrowserWindow<any> | null = null;
-let rpc: any;
+const rpcs = new Set<any>();
+let invoke: Invoke = () => { throw new Error("not configured"); };
 let quitting = false;
 let shownAt = 0;
 
-export function configureWindows(bridge: any) {
-  rpc = bridge;
+export function configureWindows(fn: Invoke) {
+  invoke = fn;
 }
 
 export function setQuitting() {
   quitting = true;
 }
 
+/** One RPC per window: an RPC object has a single transport. */
+function makeRpc() {
+  const rpc = BrowserView.defineRPC<any>({
+    maxRequestTime: 120_000,
+    handlers: {
+      requests: { invoke: ({ method, args }: { method: string; args: unknown[] }) => invoke(method, args ?? []) },
+      messages: {},
+    },
+  });
+  rpcs.add(rpc);
+  return rpc;
+}
+
+/** Pushes the latest app view to every open window. */
+export function broadcast(view: unknown) {
+  for (const rpc of rpcs) {
+    try {
+      rpc.send?.["view-changed"]?.(view);
+    } catch {
+      /* window closing */
+    }
+  }
+}
+
 function createPopover() {
   if (popover) return popover;
+  const rpc = makeRpc();
   const win = new BrowserWindow({
     title: "Quietlink",
     url: "views://popover/index.html",
@@ -40,6 +69,7 @@ function createPopover() {
     }
   });
   win.on("close", () => {
+    rpcs.delete(rpc);
     popover = null;
   });
   popover = win;
@@ -62,14 +92,16 @@ export function hidePopover() {
 }
 
 export function showSettings() {
+  hidePopover();
   if (!settings) {
+    const rpc = makeRpc();
     settings = new BrowserWindow({
       title: "Quietlink Settings",
       url: "views://settings/index.html",
       preload: "views://settings/index.js",
       renderer: "native",
       titleBarStyle: "hiddenInset",
-      frame: { width: 760, height: 620 },
+      frame: { width: 780, height: 640 },
       rpc,
     });
     settings.on("will-close", (event: any) => {
@@ -79,6 +111,7 @@ export function showSettings() {
       }
     });
     settings.on("close", () => {
+      rpcs.delete(rpc);
       settings = null;
     });
   }

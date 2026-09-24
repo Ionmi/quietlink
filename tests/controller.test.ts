@@ -228,3 +228,18 @@ test("quiet test runs A-B-A-B through the warden and produces a verdict", async 
   expect(gw().intervalMs).toBe(2000);
   expect(ctl.view().sessions).toHaveLength(0);
 });
+
+test("all probes to router and external lost → probes-blocked hint (e.g. firewall)", async () => {
+  const { ctl, helper, advance } = setup();
+  let seq = 0;
+  for (let i = 0; i < 6; i++) {
+    for (const target of ["192.168.1.1", "1.1.1.1"]) {
+      seq++;
+      helper.emit({ type: "probe-sent", target, id: 1, seq, ts: 1_000_000 + i * 2000 });
+      helper.emit({ type: "probe-result", target, id: 1, seq, ts: 1_000_000 + i * 2000 + 1000, outcome: "lost" });
+    }
+  }
+  await advance(13_000);
+  expect(ctl.view().probesBlocked).toBe(true);
+  expect(ctl.view().interruptionsLastHour).toBe(0);
+});

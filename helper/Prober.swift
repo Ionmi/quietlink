@@ -128,6 +128,7 @@ final class Prober {
   }
 
   private func expire() {
+    drain()  // replies already in the socket buffer are not losses
     let now = monotonicMs()
     for (s, t) in pending where now - t >= deadlineMs {
       pending.removeValue(forKey: s)
