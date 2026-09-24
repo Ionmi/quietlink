@@ -8,6 +8,7 @@
   :root { --bg: #16191f; --panel: #1f232b; --chip: #2a2f38; --line: #353b46; --text: #e8ebf0; --muted: #9aa2af; --accent: #19a7b3; --warn: #ea7a3f; --danger: #f0605a; }
 }
 * { box-sizing: border-box; }
+:root { accent-color: var(--accent); }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
 h1 { font-size: 20px; margin: 0 0 12px; }
 h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 20px 0 6px; }

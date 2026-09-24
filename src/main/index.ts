@@ -155,6 +155,7 @@ const cli = startCliServer(cliSock, {
   pause: () => void controller.pause(),
   resume: () => void controller.resume(),
   test: () => controller.startQuietTest(),
+  settings: () => showSettings(),
 });
 
 await ensureWarden().catch((e) => console.error("warden:", e));

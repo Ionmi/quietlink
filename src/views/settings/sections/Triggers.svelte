@@ -44,6 +44,7 @@
 <h1>{tr("set.triggers")}</h1>
 
 <h2>{tr("set.presets")}</h2>
+{#if visible.length === 0}<p class="muted small">{tr("set.noVerified")}</p>{/if}
 <ul class="list">
   {#each visible as r (r.id)}
     <li>

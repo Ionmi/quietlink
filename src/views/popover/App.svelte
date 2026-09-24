@@ -71,8 +71,8 @@
           <button class="danger" onclick={() => call("emergency")}>{tr("restore.airdrop")}</button>
         {:else}
           <div class="split">
-            <button class="primary" onclick={() => quietFor(null)} disabled={testing}>{tr("ui.quietNow")}</button>
-            <button class="primary more" aria-label="Duration" aria-expanded={menuOpen} onclick={() => (menuOpen = !menuOpen)} disabled={testing}>▾</button>
+            <button class="primary" onclick={() => quietFor(null)} disabled={testing || !v.privilege}>{tr("ui.quietNow")}</button>
+            <button class="primary more" aria-label="Duration" aria-expanded={menuOpen} onclick={() => (menuOpen = !menuOpen)} disabled={testing || !v.privilege}>▾</button>
             {#if menuOpen}
               <div class="menu" role="menu">
                 {#each [[30, "ui.for30"], [60, "ui.for60"], [120, "ui.for120"]] as [m, k] (m)}
@@ -130,13 +130,14 @@
     </section>
 
     <section>
-      <h2>{tr("ui.events")} <span class="muted small">{tr("ui.lastHour", { n: v.interruptionsLastHour })}</span></h2>
+      <h2>{tr("ui.events")}</h2>
       {#if v.lastEvents.length}
         <ul class="events">
           {#each v.lastEvents.slice(0, 5) as e (e.ts + e.kind)}
             <li><span class="muted">{time(e.ts)}</span> {e.text}{#if e.resolutionMs} <span class="muted small">±{(e.resolutionMs / 1000).toFixed(1)} s</span>{/if}{#if e.note}<br /><span class="muted small">{e.note}</span>{/if}</li>
           {/each}
         </ul>
+        <p class="muted small">{tr("ui.lastHour", { n: v.interruptionsLastHour })}</p>
       {:else}
         <p class="muted">{tr("ui.noEvents")}</p>
       {/if}

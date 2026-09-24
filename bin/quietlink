@@ -5,8 +5,8 @@ import { join } from "node:path";
 
 const sock = join(process.env.QUIETLINK_SUPPORT_DIR ?? join(homedir(), "Library/Application Support/Quietlink"), "cli.sock");
 const [cmd = "status", arg] = process.argv.slice(2);
-const usage = "usage: quietlink status | on [minutes] | off | pause | resume | test";
-if (!["status", "on", "off", "pause", "resume", "test"].includes(cmd)) {
+const usage = "usage: quietlink status | on [minutes] | off | pause | resume | test | settings";
+if (!["status", "on", "off", "pause", "resume", "test", "settings"].includes(cmd)) {
   console.error(usage);
   process.exit(2);
 }
