@@ -263,6 +263,12 @@ setTimeout(() => void runUpdateCheck(), 15_000);
 setInterval(() => void runUpdateCheck(), 24 * 3_600_000);
 
 await ensureWarden().catch((e) => console.error("warden:", e));
+// Keep "Open at login" pointing at this copy of the app (it may have moved or been updated).
+if (settings.get().launchAtLogin) {
+  const loginPath = join(homedir(), "Library/LaunchAgents", `${LOGIN_LABEL}.plist`);
+  const want = loginPlist(appBundle);
+  if (!existsSync(loginPath) || readFileSync(loginPath, "utf8") !== want) await installAgent(LOGIN_LABEL, want).catch((e) => console.error("login agent:", e));
+}
 await controller.start();
 console.log(`Quietlink ${pkg.version} running (support dir ${appSupport})`);
 
