@@ -85,7 +85,7 @@ bun run start
 
 Tests: `bun test` (domain, adapters, controller), `bun run test:helper` (warden core + sensor self-test), `bun run test:integration` (warden in dry-run: leases, crash recovery, SIGTERM, hang watchdog).
 
-If you use a firewall such as LuLu or Little Snitch, allow `quietlink-helper` to send ICMP. Otherwise Quietlink shows "all probes are failing".
+If you use a firewall such as LuLu or Little Snitch, allow `quietlink-helper` to send ICMP. Otherwise Quietlink shows "all probes are failing". Until releases are Developer ID signed, the firewall asks again after each update.
 
 ## Resource use
 

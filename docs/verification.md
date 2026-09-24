@@ -43,3 +43,9 @@ No measurable difference on this run: with the Mac on 6 GHz, AWDL caused no spik
 - Call presets: bundle IDs of FaceTime, Microsoft Teams, Discord and Slack match the installed apps. Zoom opened without a meeting does not start `CptHost` (no false trigger); a real meeting is still to be checked. Webex not installed.
 - Input-device heuristic reads inactive with the Teams virtual audio device installed.
 - Resource use (Apple Silicon): app 73 MB, 0.7 % CPU idle / 1.1 % in quiet mode; sensor helper 17 MB, 1.4 % / 1.8 %; warden 4 MB, ~0 %.
+
+## Releases and update notice (2026-09-24)
+
+- Tag `v0.1.0` → Release workflow built and published `Quietlink-0.1.0-macos-arm64.zip` + SHA-256; downloaded, checksum OK, installed to /Applications, warden LaunchAgent repointed to the installed helper.
+- Tag `v0.1.1` → published; the installed 0.1.0 detected 0.1.1 at launch with the correct download URL.
+- Note: releases are ad-hoc signed, so firewalls such as LuLu ask again for each new version.
