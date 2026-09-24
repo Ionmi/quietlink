@@ -91,3 +91,44 @@ test("targets are independent", () => {
   l.onEvent(sent(1, 0)); l.onEvent(res(1, 1000, "lost"));
   expect(l.window("ext", 5000).sent).toBe(0);
 });
+
+const err = (seq: number, ts: number): HelperEvent => ({ v: 1, type: "probe-result", ts, target: "gw", id: 1, seq, outcome: "error", error: "unreachable" });
+
+test("errors are counted separately and never form interruptions", () => {
+  const l = L();
+  l.onEvent(sent(1, 0)); l.onEvent(res(1, 3, "reply", 3));
+  l.onEvent(sent(2, 500)); l.onEvent(err(2, 510));
+  l.onEvent(sent(3, 1000)); l.onEvent(err(3, 1010));
+  l.onEvent(sent(4, 1500)); l.onEvent(res(4, 1504, "reply", 4));
+  expect(l.interruptions("gw")).toEqual([]);
+  expect(l.window("gw", 5000)).toMatchObject({ sent: 4, lost: 0, errors: 2 });
+});
+
+test("loss/error/loss is not two consecutive losses", () => {
+  const l = L();
+  l.onEvent(sent(1, 0)); l.onEvent(res(1, 1000, "lost"));
+  l.onEvent(sent(2, 500)); l.onEvent(err(2, 510));
+  l.onEvent(sent(3, 1000)); l.onEvent(res(3, 2000, "lost"));
+  expect(l.interruptions("gw")).toEqual([]);
+});
+
+test("unknown probe breaks a run", () => {
+  const l = L();
+  l.onEvent(sent(1, 0)); l.onEvent(res(1, 1000, "lost"));
+  l.onEvent(sent(2, 500)); l.onHelperRestart(600);
+  l.onEvent(sent(3, 1000, 2)); l.onEvent(res(3, 2000, "lost", undefined, 2));
+  expect(l.interruptions("gw")).toEqual([]);
+});
+
+test("losses on opposite sides of sleep do not merge", () => {
+  const l = L();
+  l.onEvent(sent(1, 0)); l.onEvent(res(1, 1000, "lost"));
+  l.onEvent(sent(2, 500)); l.onEvent(res(2, 1500, "lost"));
+  l.onPause(400, 600);
+  expect(l.interruptions("gw")).toEqual([]);
+  const l2 = L();
+  l2.onEvent(sent(1, 0)); l2.onEvent(res(1, 1000, "lost"));
+  l2.onPause(100, 5000);
+  l2.onEvent(sent(2, 6000)); l2.onEvent(res(2, 7000, "lost"));
+  expect(l2.interruptions("gw")).toEqual([]);
+});

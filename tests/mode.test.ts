@@ -125,3 +125,20 @@ test("timed leases expire", () => {
   expect(set.active(3_599_999)).toHaveLength(1);
   expect(set.active(3_600_000)).toHaveLength(0);
 });
+
+test("lease arriving while release is pending re-activates after confirmation", () => {
+  const r = run(initialMode, on(), ok(), off(5000), { kind: "tick", now: 15_001 }, on(15_100), { kind: "released", generation: 1 });
+  expect(r.state.phase).toBe("activating");
+  expect(r.effects.at(-1)).toEqual({ kind: "hold", generation: 2 });
+});
+
+test("cancelling before hold-ok releases the token that arrives later", () => {
+  const r = run(initialMode, on(), off(10), ok(1, 42));
+  expect(r.effects).toContainEqual({ kind: "release", token: 42, generation: 1 });
+  expect(r.state.phase).toBe("restoring");
+});
+
+test("sleep before hold-ok releases the late token", () => {
+  const r = run(initialMode, on(), { kind: "sleep" }, ok(1, 43));
+  expect(r.effects).toContainEqual({ kind: "release", token: 43, generation: 1 });
+});

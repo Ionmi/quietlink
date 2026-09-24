@@ -6,10 +6,14 @@ export type BlockStats = { cond: "A" | "B"; sent: number; lost: number; spikes: 
 
 export type QTState = {
   phase: QTPhase;
+  /** Identifies one test run; acknowledgements and stats from other runs are ignored. */
+  run: number;
   block: number;
   blockStart: number | null;
   holdAcked: boolean;
-  results: BlockStats[];
+  /** Latest AWDL observation during the current transition (null = none yet). */
+  awdlUp: boolean | null;
+  results: (BlockStats & { block: number })[];
   reason?: string;
   baseline: WifiFingerprint | null;
 };
@@ -17,10 +21,10 @@ export type QTState = {
 export type QTInput =
   | { kind: "start"; now: number; activeLeases: number; inGrace: boolean; wifi: WifiFingerprint }
   | { kind: "awdl-observed"; up: boolean; now: number }
-  | { kind: "hold-ack"; now: number }
+  | { kind: "hold-ack"; run: number; now: number }
   | { kind: "transition-failed"; reason: string }
   | { kind: "tick"; now: number; wifi: WifiFingerprint }
-  | { kind: "block-stats"; stats: BlockStats }
+  | { kind: "block-stats"; run: number; block: number; stats: BlockStats }
   | { kind: "trigger-started" }
   | { kind: "cancel" };
 
@@ -28,12 +32,12 @@ export type QTEffect =
   | { kind: "test-hold" }
   | { kind: "test-release" }
   | { kind: "hand-over-release" }
-  | { kind: "collect-block"; cond: "A" | "B"; from: number; to: number }
+  | { kind: "collect-block"; run: number; block: number; cond: "A" | "B"; from: number; to: number }
   | { kind: "set-probe-interval"; ms: number | null };
 
 export const TEST_PROBE_MS = 200;
 export const BLOCKS = 4;
-export const initialQT: QTState = { phase: "idle", block: 0, blockStart: null, holdAcked: false, results: [], baseline: null };
+export const initialQT: QTState = { phase: "idle", run: 0, block: 0, blockStart: null, holdAcked: false, awdlUp: null, results: [], baseline: null };
 
 type Out = { state: QTState; effects: QTEffect[] };
 const RUNNING: QTPhase[] = ["arming-A", "A", "arming-B", "B"];
@@ -54,9 +58,12 @@ export function qtReduce(s: QTState, i: QTInput, blockMs = 60_000): Out {
   if (i.kind === "start") {
     if (running) return none;
     if (i.activeLeases > 0 || i.inGrace) return { state: { ...initialQT, phase: "invalid", reason: "busy" }, effects: [] };
-    return { state: { ...initialQT, phase: "arming-A", baseline: i.wifi }, effects: [{ kind: "set-probe-interval", ms: TEST_PROBE_MS }] };
+    return { state: { ...initialQT, run: s.run + 1, phase: "arming-A", baseline: i.wifi }, effects: [{ kind: "set-probe-interval", ms: TEST_PROBE_MS }] };
   }
-  if (i.kind === "block-stats") return s.phase === "idle" ? none : { state: { ...s, results: [...s.results, i.stats] }, effects: [] };
+  if (i.kind === "block-stats") {
+    if (i.run !== s.run || s.phase === "idle" || s.results.some((r) => r.block === i.block)) return none;
+    return { state: { ...s, results: [...s.results, { ...i.stats, block: i.block }] }, effects: [] };
+  }
   if (!running) return none;
 
   switch (i.kind) {
@@ -67,15 +74,23 @@ export function qtReduce(s: QTState, i: QTInput, blockMs = 60_000): Out {
     case "transition-failed":
       return stop(s, "invalid", "test-release", i.reason);
     case "hold-ack":
-      return s.phase === "arming-B" ? { state: { ...s, holdAcked: true }, effects: [] } : none;
+      if (s.phase !== "arming-B" || i.run !== s.run) return none;
+      if (s.awdlUp === false) return { state: { ...s, holdAcked: true, phase: "B", blockStart: i.now }, effects: [] };
+      return { state: { ...s, holdAcked: true }, effects: [] };
     case "awdl-observed":
-      if (s.phase === "arming-A" && i.up) return { state: { ...s, phase: "A", blockStart: i.now }, effects: [] };
-      if (s.phase === "arming-B" && !i.up && s.holdAcked) return { state: { ...s, phase: "B", blockStart: i.now }, effects: [] };
+      if (s.phase === "arming-A") return i.up ? { state: { ...s, phase: "A", blockStart: i.now, awdlUp: true }, effects: [] } : { state: { ...s, awdlUp: false }, effects: [] };
+      if (s.phase === "arming-B") {
+        if (!i.up && s.holdAcked) return { state: { ...s, phase: "B", blockStart: i.now, awdlUp: false }, effects: [] };
+        return { state: { ...s, awdlUp: i.up }, effects: [] };
+      }
+      // Baseline must keep AWDL as the system leaves it; something else turning it
+      // off invalidates A. During B, brief re-enables are part of quiet mode itself.
+      if (s.phase === "A" && !i.up) return stop(s, "invalid", "test-release", "condition-changed");
       return none;
     case "tick": {
       if (s.baseline && !sameWifi(s.baseline, i.wifi)) return stop(s, "invalid", "test-release", "network-changed");
       if ((s.phase !== "A" && s.phase !== "B") || s.blockStart === null || i.now - s.blockStart < blockMs) return none;
-      const collect: QTEffect = { kind: "collect-block", cond: condOf(s.block), from: s.blockStart, to: i.now };
+      const collect: QTEffect = { kind: "collect-block", run: s.run, block: s.block, cond: condOf(s.block), from: s.blockStart, to: i.now };
       const next = s.block + 1;
       if (next >= BLOCKS) {
         return {
@@ -83,13 +98,16 @@ export function qtReduce(s: QTState, i: QTInput, blockMs = 60_000): Out {
           effects: [collect, ...(s.phase === "B" ? [{ kind: "test-release" } as QTEffect] : []), { kind: "set-probe-interval", ms: null }],
         };
       }
-      if (condOf(next) === "B") return { state: { ...s, phase: "arming-B", block: next, blockStart: null, holdAcked: false }, effects: [collect, { kind: "test-hold" }] };
-      return { state: { ...s, phase: "arming-A", block: next, blockStart: null }, effects: [collect, { kind: "test-release" }] };
+      const armed = { ...s, block: next, blockStart: null, holdAcked: false, awdlUp: null };
+      if (condOf(next) === "B") return { state: { ...armed, phase: "arming-B" }, effects: [collect, { kind: "test-hold" }] };
+      return { state: { ...armed, phase: "arming-A" }, effects: [collect, { kind: "test-release" }] };
     }
   }
 }
 
+/** Only a completed run with all four blocks' statistics yields a comparison. */
 export function verdict(s: QTState) {
+  if (s.phase !== "done" || s.results.length !== BLOCKS) return null;
   const sum = (cond: "A" | "B") => {
     const rs = s.results.filter((r) => r.cond === cond);
     return rs.length ? { sent: rs.reduce((a, r) => a + r.sent, 0), lost: rs.reduce((a, r) => a + r.lost, 0), spikes: rs.reduce((a, r) => a + r.spikes, 0) } : null;

@@ -95,7 +95,11 @@ export function reduce(s: ModeState, i: ModeInput, cfg: { graceMs: number }): Ou
     }
 
     case "hold-ok":
-      if (s.phase !== "activating" || i.generation !== s.generation) return none;
+      if (i.generation !== s.generation) return none;
+      // Hold was cancelled (no leases or sleep) before the warden answered: release its token.
+      if (s.phase === "restoring" && s.token === null)
+        return { state: { ...s, token: i.token }, effects: [{ kind: "release", token: i.token, generation: s.generation }] };
+      if (s.phase !== "activating") return none;
       return { state: { ...s, phase: "active", token: i.token, faultCount: 0, faultRetryAt: null, lastError: null }, effects: [] };
 
     case "hold-failed": {
@@ -111,7 +115,7 @@ export function reduce(s: ModeState, i: ModeInput, cfg: { graceMs: number }): Ou
     case "released":
       if (i.generation !== s.generation) return none;
       if (s.phase === "airdrop-break") return { state: { ...s, token: null }, effects: [] };
-      if (s.phase === "restoring") return { state: idle(s), effects: [] };
+      if (s.phase === "restoring") return s.leases > 0 ? activate(idle(s)) : { state: idle(s), effects: [] };
       return none;
 
     case "emergency":
@@ -126,6 +130,7 @@ export function reduce(s: ModeState, i: ModeInput, cfg: { graceMs: number }): Ou
 
     case "sleep":
       if (s.phase === "inactive") return none;
+      if (s.phase === "activating") return release({ ...s, leases: 0 });
       return { state: idle(s), effects: [{ kind: "release", token: s.token, generation: s.generation }] };
 
     case "wake":

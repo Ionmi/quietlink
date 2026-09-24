@@ -39,5 +39,6 @@ export function matchRules(rules: TriggerRule[], procs: ProcInfo[], inputActive:
 export function loadPresets(json: unknown): TriggerRule[] {
   const j = json as { version?: number; rules?: TriggerRule[] };
   if (j?.version !== 1 || !Array.isArray(j.rules)) throw new Error(`unsupported presets version ${j?.version}`);
-  return j.rules.map((r) => ({ ...r, match: { ...r.match } }));
+  // Unverified presets ship disabled until checked against the real app.
+  return j.rules.map((r) => ({ ...r, match: { ...r.match }, enabled: r.enabled && r.verified }));
 }

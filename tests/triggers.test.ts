@@ -55,3 +55,11 @@ test("executable match requires a path boundary", () => {
   expect(matchRules(r, [P(1, "/A.app/Contents/MacOS/Game")], null)).toHaveLength(1);
   expect(matchRules(r, [P(1, "/A.app/Contents/NotMacOS/Game")], null)).toHaveLength(0);
 });
+
+test("unverified presets load disabled", () => {
+  expect(loadPresets(presets).filter((r) => !r.verified).every((r) => !r.enabled)).toBe(true);
+});
+
+test("every call preset except Zoom meeting requires input activity", () => {
+  for (const r of loadPresets(presets).filter((r) => r.kind === "call" && r.id !== "zoom-meeting")) expect(r.requireInput).toBe(true);
+});

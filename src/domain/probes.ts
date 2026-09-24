@@ -80,21 +80,36 @@ export class ProbeLedger {
     const done = rs.filter((r) => r.outcome !== "pending");
     return {
       sent: done.length,
-      lost: done.filter((r) => r.outcome === "lost" || r.outcome === "error").length,
+      lost: done.filter((r) => r.outcome === "lost").length,
+      errors: done.filter((r) => r.outcome === "error").length,
       late: done.filter((r) => r.late !== undefined).length,
       replies: done.filter((r) => r.outcome === "reply").map((r) => r.rttMs ?? 0),
       provisional: rs.some((r) => r.outcome === "pending"),
     };
   }
 
+  /**
+   * Runs of >= 2 consecutive deadline losses. Anything that is not a deadline loss
+   * (error, unknown, paused, gap across a pause) breaks the run, so losses are
+   * never joined across unobserved intervals.
+   */
   interruptions(target: string): Interruption[] {
-    const rs = this.inWindow(target, this.latest(target)).filter((r) => r.outcome !== "pending");
-    const deltas = rs.slice(1).map((r, i) => r.sentAt - rs[i].sentAt).sort((a, b) => a - b);
+    const all = [...this.records(target).values()].sort((a, b) => a.sentAt - b.sentAt);
+    const observed = all.filter((r) => r.outcome === "reply" || r.outcome === "lost");
+    const deltas = observed.slice(1).map((r, i) => r.sentAt - observed[i].sentAt).sort((a, b) => a - b);
     const resolutionMs = deltas.length ? deltas[Math.floor(deltas.length / 2)] : 0;
     const out: Interruption[] = [];
     let lastReply: number | null = null;
     let run: ProbeRecord[] = [];
-    for (const r of rs) {
+    const pauseBetween = (a: ProbeRecord, b: ProbeRecord) => this.pauses.some(([x, y]) => x <= b.sentAt && y >= a.sentAt);
+    for (const r of all) {
+      if (r.outcome === "pending") continue;
+      const broken = r.outcome === "error" || r.outcome === "unknown" || this.paused(r.sentAt) || (run.length > 0 && pauseBetween(run[run.length - 1], r));
+      if (broken) {
+        run = [];
+        lastReply = null;
+        continue;
+      }
       if (r.outcome === "reply") {
         if (run.length >= 2) out.push({ start: lastReply ?? run[0].sentAt, end: r.resultAt ?? r.sentAt, lostCount: run.length, resolutionMs });
         run = [];
