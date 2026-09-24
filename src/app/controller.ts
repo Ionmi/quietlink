@@ -9,6 +9,7 @@ import { initialQT, qtReduce, type QTEffect, type QTInput, type QTState } from "
 import { summarize, type SessionSummary } from "../domain/session";
 import { matchRules } from "../domain/triggers";
 import { TrafficMeter, type Traffic } from "../domain/menubar";
+import type { Update } from "../domain/version";
 import type { Settings, SettingsStore } from "../adapters/settings-store";
 import type { TelemetryStore } from "../adapters/telemetry-store";
 import type { HelperCommand, HelperEvent, ProcInfo, WardenResponse, WardenStatus, WifiEvent } from "../shared/protocol";
@@ -63,6 +64,8 @@ export type AppView = {
   breakUntil: number | null;
   timedUntil: number | null;
   settings: Settings;
+  version: string;
+  update: { available: Update | null; status: "idle" | "checking" | "up-to-date" | "error"; checkedAt: number | null };
 };
 
 type Deps = {
@@ -79,6 +82,7 @@ type Deps = {
   wardenPid: () => Promise<number | null>;
   macosMajor: number;
   installLoginAgent?: (on: boolean) => Promise<void>;
+  version?: string;
   startLogStream?: (onEvent: (e: WifiLogEvent) => void) => { stop(): void };
 };
 
@@ -116,6 +120,7 @@ export class Controller {
   private session: OpenSession | null = null;
   private secondAcc = new Map<string, { count: number; sum: number; min: number; max: number; lost: number; late: number }>();
   private lastRestored = 0;
+  private update: AppView["update"] = { available: null, status: "idle", checkedAt: null };
   private trafficMeter = new TrafficMeter();
   private traffic: Traffic | null = null;
   private lastPrune = 0;
@@ -408,6 +413,11 @@ export class Controller {
       seen.set(p.path, { name: bundle.split("/").pop()!.replace(/\.app$/, ""), path: p.path, bundle });
     }
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  setUpdate(u: Partial<AppView["update"]>) {
+    this.update = { ...this.update, ...u };
+    this.changed();
   }
 
   clearData() {
@@ -764,6 +774,8 @@ export class Controller {
       breakUntil: this.mode.breakUntil,
       timedUntil: this.leases.all().find((l) => l.id === "timed")?.expiresAt ?? null,
       settings: this.s,
+      version: this.d.version ?? "0.0.0",
+      update: this.update,
     };
   }
 }

@@ -27,6 +27,8 @@ export type Api = {
   closePopover(): void;
   popoverHeight(px: number): void;
   quit(): void;
+  checkUpdates(): Promise<void>;
+  openUpdate(kind: "page" | "download"): void;
 };
 
 export function dispatch(api: Api, method: string, args: unknown[]) {

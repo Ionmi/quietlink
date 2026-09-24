@@ -215,6 +215,15 @@ const en = {
   "ui.reconnectConfirmShort": "Wi-Fi drops briefly — click again",
   "s.untestedTag": "Untested",
   "s.untestedNote": "Untested entries haven't been checked on this Mac yet and may not turn quiet mode on.",
+  "s.checkNow": "Check now",
+  "s.download": "Download {v}",
+  "s.downloadShort": "Download",
+  "s.updateAvailable": "Quietlink {v} is available.",
+  "s.checking": "Checking for updates…",
+  "s.upToDate": "You have the latest version.",
+  "s.checkFailed": "Couldn't reach GitHub. Try again later.",
+  "s.autoCheck": "Check for updates automatically",
+  "s.autoCheckDetail": "Once a day, Quietlink asks GitHub for the latest release. Nothing else is sent.",
 };
 
 export type Key = keyof typeof en;
@@ -434,6 +443,15 @@ const es: Record<Key, string> = {
   "ui.reconnectConfirmShort": "El Wi-Fi se corta un momento — pulsa otra vez",
   "s.untestedTag": "Sin probar",
   "s.untestedNote": "Las entradas sin probar aún no se han comprobado en este Mac y pueden no activar el modo silencio.",
+  "s.checkNow": "Buscar ahora",
+  "s.download": "Descargar {v}",
+  "s.downloadShort": "Descargar",
+  "s.updateAvailable": "Quietlink {v} está disponible.",
+  "s.checking": "Buscando actualizaciones…",
+  "s.upToDate": "Tienes la última versión.",
+  "s.checkFailed": "No se pudo contactar con GitHub. Prueba más tarde.",
+  "s.autoCheck": "Buscar actualizaciones automáticamente",
+  "s.autoCheckDetail": "Una vez al día, Quietlink pregunta a GitHub cuál es la última versión. No se envía nada más.",
 };
 
 export const strings: Record<Lang, Record<Key, string>> = { en, es };

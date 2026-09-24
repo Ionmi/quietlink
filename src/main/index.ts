@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { Controller } from "../app/controller";
 import { buildReport } from "../app/export";
 import { safeUninstall } from "../app/uninstall";
+import { checkForUpdate } from "../adapters/update-check";
 import { startCliServer } from "../app/cli-server";
 import { HelperClient } from "../adapters/helper-client";
 import { WardenClient, wardenPid } from "../adapters/warden-client";
@@ -55,6 +56,7 @@ const controller = new Controller({
   gatewayKey: key,
   wardenPid: () => wardenPid(WARDEN_LABEL),
   macosMajor: Number(macos.split(".")[0]) || 0,
+  version: pkg.version,
   installLoginAgent: (on) => (on ? installAgent(LOGIN_LABEL, loginPlist(appBundle)) : removeAgent(LOGIN_LABEL)),
   startLogStream: (onEvent) => {
     const s = new LogStream(Number(macos.split(".")[0]) || 0);
@@ -137,6 +139,13 @@ const api: Api = {
   closePopover: () => hidePopover(),
   popoverHeight: (px) => setPopoverHeight(px),
   quit: () => void finish(),
+  checkUpdates: () => runUpdateCheck(true),
+  openUpdate: (kind) => {
+    const u = controller.view().update.available;
+    const url = kind === "download" ? u?.download ?? u?.page : u?.page;
+    // Only ever opens this project's GitHub release pages.
+    if (url && url.startsWith("https://github.com/Ionmi/quietlink/")) Utils.openExternal(url);
+  },
 };
 configureWindows((method, args) => dispatch(api, method, args));
 
@@ -190,6 +199,27 @@ const cli = startCliServer(cliSock, {
   test: () => controller.startQuietTest(),
   settings: () => showSettings(),
 });
+
+// Update check: at launch and daily, unless turned off in Settings. Only a notice;
+// installing stays manual until releases are signed with a Developer ID.
+let notifiedVersion = "";
+async function runUpdateCheck(manual = false) {
+  if (!manual && !settings.get().checkForUpdates) return;
+  controller.setUpdate({ status: "checking" });
+  try {
+    const available = await checkForUpdate(pkg.version);
+    controller.setUpdate({ available, status: available ? "idle" : "up-to-date", checkedAt: Date.now() });
+    if (available && available.version !== notifiedVersion) {
+      notifiedVersion = available.version;
+      const es = settings.get().lang === "es";
+      Utils.showNotification({ title: es ? `Quietlink ${available.version} disponible` : `Quietlink ${available.version} is available`, body: es ? "Ábrelo desde el panel para descargarlo." : "Open the panel to download it." });
+    }
+  } catch {
+    controller.setUpdate({ status: "error", checkedAt: Date.now() });
+  }
+}
+setTimeout(() => void runUpdateCheck(), 15_000);
+setInterval(() => void runUpdateCheck(), 24 * 3_600_000);
 
 await ensureWarden().catch((e) => console.error("warden:", e));
 await controller.start();

@@ -52,10 +52,25 @@ That is the entire root surface: two exact commands, no wildcards, and no daemon
 
 ## Privacy
 
-- Everything stays on your Mac. There is no telemetry. The only network traffic Quietlink creates is ICMP probes to your router and to the targets you configure (`1.1.1.1` by default; you can clear it).
+- Everything stays on your Mac. There is no telemetry. The only network traffic Quietlink creates is ICMP probes to your router and to the targets you configure (`1.1.1.1` by default; you can clear it), plus one daily request to GitHub's public API to look for a new release (can be turned off).
 - Per-second samples and events are kept 24 h, sessions 30 days. Settings → Data → Clear all data deletes them.
 - Quietlink never stores SSIDs, BSSIDs, raw log lines, command lines or audio. Networks are told apart by a keyed hash of the router's MAC address.
 - Diagnostics exports are redacted by default (user name, home paths, IP and MAC addresses, targets).
+
+## Install
+
+1. Download `Quietlink-<version>-macos-arm64.zip` from [Releases](https://github.com/Ionmi/quietlink/releases) and unzip it.
+2. Move `Quietlink.app` to `/Applications`.
+3. The first time, right-click it and choose **Open**: releases aren't signed with an Apple Developer ID yet, so macOS asks for confirmation once. (Alternatively: `xattr -dr com.apple.quarantine /Applications/Quietlink.app`.)
+4. Open the menu-bar panel → Settings → Permissions → **Allow…**
+
+## Updates
+
+Quietlink checks GitHub for a newer release at launch and once a day (Settings → About; can be turned off) and shows a notice with a download link. To update, quit Quietlink, replace the app in `/Applications` and open it again; settings and permissions are kept.
+
+Fully automatic updates will come once releases are signed and notarized: an app that installs a system permission should never replace itself with an unsigned download.
+
+Maintainers: bump `version` in `package.json`, commit, then push a tag `vX.Y.Z`. The Release workflow checks the tag, runs the tests, builds and publishes the zip with its SHA-256.
 
 ## Build from source
 
@@ -84,7 +99,7 @@ Verified on macOS 27 on Apple Silicon. Other macOS 14+ versions and Intel Macs s
 
 - Holding AWDL down with a 1-second loop *reduces* AWDL activity. It cannot stop macOS from using it for a moment between checks.
 - Other causes of cuts (firmware scans, roaming, a weak link, the ISP) are measured, not fixed.
-- There are no signed binaries yet. Build from source. Signed releases and auto-update will come with Developer ID signing and an `SMAppService` daemon.
+- Releases are ad-hoc signed, not notarized. Signed releases, automatic updates and an `SMAppService` daemon will come with a Developer ID.
 
 ## Uninstall
 

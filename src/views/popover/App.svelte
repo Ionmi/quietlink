@@ -127,6 +127,9 @@
     {:else if !v.wardenHealthy}
       <p class="alert">{tr("ui.wardenDown")}</p>
     {/if}
+    {#if v.update.available}
+      <p class="alert soft">{tr("s.updateAvailable", { v: v.update.available.version })} <button class="text" onclick={() => call("openUpdate", "download")}>{tr("s.downloadShort")}</button></p>
+    {/if}
     {#if v.probesBlocked}<p class="alert">{tr("ui.probesBlocked")}</p>{/if}
     {#if v.paused}<p class="alert soft">{tr("ui.paused")} <button class="text" onclick={() => call("resume")}>{tr("resume.automation")}</button></p>{/if}
 

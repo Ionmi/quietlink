@@ -1,0 +1,34 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Tag must match package.json version
+        run: |
+          v=$(bun -e 'console.log(require("./package.json").version)')
+          test "v$v" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != package.json $v"; exit 1; }
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - run: bun install
+      - run: bunx electrobun prepare
+      - run: bun run check
+      - run: bun test
+      - run: bun run build:release
+      - name: Package
+        run: |
+          name="Quietlink-${VERSION}-macos-arm64.zip"
+          ditto -c -k --keepParent build/electrobun/stable-macos-arm64/Quietlink.app "$name"
+          shasum -a 256 "$name" > "$name.sha256"
+          echo "ASSET=$name" >> "$GITHUB_ENV"
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "$ASSET" "$ASSET.sha256" --title "Quietlink $VERSION" --generate-notes

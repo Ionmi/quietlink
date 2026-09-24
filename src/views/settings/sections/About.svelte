@@ -6,6 +6,14 @@
   import Select from "../ui/Select.svelte";
 
   const s = $derived(app.view!.settings);
+  const updateLine = $derived.by(() => {
+    const u = app.view!.update;
+    if (u.available) return tr("s.updateAvailable", { v: u.available.version });
+    if (u.status === "checking") return tr("s.checking");
+    if (u.status === "up-to-date") return tr("s.upToDate");
+    if (u.status === "error") return tr("s.checkFailed");
+    return undefined;
+  });
 </script>
 
 <div class="hero">
@@ -33,7 +41,17 @@
 </Group>
 
 <Group note={tr("set.support")}>
-  <Row title={tr("s.version")}><span class="dim">0.1.0</span></Row>
+  <Row title={tr("s.version")} detail={updateLine}>
+    <span class="dim">{app.view!.version}</span>
+    {#if app.view!.update.available}
+      <button class="btn primary" onclick={() => call("openUpdate", "download")}>{tr("s.download", { v: app.view!.update.available.version })}</button>
+    {:else}
+      <button class="btn" onclick={() => call("checkUpdates")} disabled={app.view!.update.status === "checking"}>{tr("s.checkNow")}</button>
+    {/if}
+  </Row>
+  <Row title={tr("s.autoCheck")} detail={tr("s.autoCheckDetail")}>
+    <Switch checked={s.checkForUpdates} label={tr("s.autoCheck")} onchange={(v) => call("updateSettings", { checkForUpdates: v })} />
+  </Row>
   <Row title={tr("s.license")}><span class="dim">MIT</span></Row>
 </Group>
 

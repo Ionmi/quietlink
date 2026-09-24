@@ -16,6 +16,7 @@ export type Settings = {
   explainCuts: boolean;
   launchAtLogin: boolean;
   paused: boolean;
+  checkForUpdates: boolean;
   bandHistory: BandHistory;
 };
 
@@ -23,7 +24,7 @@ export function defaults(lang: Lang = "en"): Settings {
   return {
     lang, graceMs: 10_000, externalTarget: "1.1.1.1", extraTargets: [], showPingInMenuBar: true, showTrafficInMenuBar: true,
     rules: loadPresets(presets), inputTrigger: false, explainCuts: false, launchAtLogin: false,
-    paused: false, bandHistory: {},
+    paused: false, checkForUpdates: true, bandHistory: {},
   };
 }
 

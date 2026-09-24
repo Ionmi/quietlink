@@ -1,10 +1,11 @@
 import type { ElectrobunConfig } from "electrobun";
+import pkg from "./package.json";
 
 // Hutch reads the version field; the SDK type only declares entrypoint.
 const bunRuntime = { entrypoint: "src/main/index.ts", version: "1.4.2" };
 
 export default {
-  app: { name: "Quietlink", identifier: "dev.quietlink.app", version: "0.1.0" },
+  app: { name: "Quietlink", identifier: "dev.quietlink.app", version: pkg.version },
   runtime: { exitOnLastWindowClosed: false },
   build: {
     mainProcess: "bun",
