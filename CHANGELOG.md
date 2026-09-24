@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.2 — 2026-09-24
+- Updates install themselves: Install and restart downloads the release, checks its SHA-256 and bundle, swaps it in (old version to the Trash) and relaunches. Also `quietlink update`.
+
 ## 0.1.1 — 2026-09-24
 - First release built and published automatically by the Release workflow.
 - In-app update notice (Settings → About, and the menu-bar panel).

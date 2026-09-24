@@ -9,6 +9,7 @@ export type CliHandlers = {
   resume(): void;
   test(): void;
   settings?(): void;
+  update?(): void;
 };
 
 /**
@@ -52,6 +53,7 @@ export function startCliServer(path: string, h: CliHandlers) {
             case "resume": h.resume(); break;
             case "test": h.test(); break;
             case "settings": h.settings?.(); break;
+            case "update": h.update?.(); break;
             default: s.write(reply({ ok: false, error: "unknown command" })); return;
           }
           s.write(reply({ ok: true }));

@@ -29,6 +29,7 @@ export type Api = {
   quit(): void;
   checkUpdates(): Promise<void>;
   openUpdate(kind: "page" | "download"): void;
+  installUpdate(): Promise<{ ok: boolean; error?: string }>;
 };
 
 export function dispatch(api: Api, method: string, args: unknown[]) {

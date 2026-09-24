@@ -224,6 +224,11 @@ const en = {
   "s.checkFailed": "Couldn't reach GitHub. Try again later.",
   "s.autoCheck": "Check for updates automatically",
   "s.autoCheckDetail": "Once a day, Quietlink asks GitHub for the latest release. Nothing else is sent.",
+  "s.installUpdate": "Install {v} and restart",
+  "s.installShort": "Install",
+  "s.installing": "Downloading and checking…",
+  "s.restarting": "Restarting…",
+  "s.installFailed": "The update couldn't be installed ({error}). Your current version is untouched.",
 };
 
 export type Key = keyof typeof en;
@@ -452,6 +457,11 @@ const es: Record<Key, string> = {
   "s.checkFailed": "No se pudo contactar con GitHub. Prueba más tarde.",
   "s.autoCheck": "Buscar actualizaciones automáticamente",
   "s.autoCheckDetail": "Una vez al día, Quietlink pregunta a GitHub cuál es la última versión. No se envía nada más.",
+  "s.installUpdate": "Instalar {v} y reiniciar",
+  "s.installShort": "Instalar",
+  "s.installing": "Descargando y comprobando…",
+  "s.restarting": "Reiniciando…",
+  "s.installFailed": "No se pudo instalar la actualización ({error}). Tu versión actual sigue intacta.",
 };
 
 export const strings: Record<Lang, Record<Key, string>> = { en, es };

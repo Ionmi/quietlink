@@ -65,7 +65,13 @@ export type AppView = {
   timedUntil: number | null;
   settings: Settings;
   version: string;
-  update: { available: Update | null; status: "idle" | "checking" | "up-to-date" | "error"; checkedAt: number | null };
+  update: {
+    available: Update | null;
+    status: "idle" | "checking" | "up-to-date" | "error";
+    checkedAt: number | null;
+    install: "idle" | "downloading" | "restarting" | "error";
+    installError?: string;
+  };
 };
 
 type Deps = {
@@ -120,7 +126,7 @@ export class Controller {
   private session: OpenSession | null = null;
   private secondAcc = new Map<string, { count: number; sum: number; min: number; max: number; lost: number; late: number }>();
   private lastRestored = 0;
-  private update: AppView["update"] = { available: null, status: "idle", checkedAt: null };
+  private update: AppView["update"] = { available: null, status: "idle", checkedAt: null, install: "idle" };
   private trafficMeter = new TrafficMeter();
   private traffic: Traffic | null = null;
   private lastPrune = 0;

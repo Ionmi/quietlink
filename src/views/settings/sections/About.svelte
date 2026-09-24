@@ -8,6 +8,7 @@
   const s = $derived(app.view!.settings);
   const updateLine = $derived.by(() => {
     const u = app.view!.update;
+    if (u.install === "error") return tr("s.installFailed", { error: u.installError ?? "?" });
     if (u.available) return tr("s.updateAvailable", { v: u.available.version });
     if (u.status === "checking") return tr("s.checking");
     if (u.status === "up-to-date") return tr("s.upToDate");
@@ -44,7 +45,9 @@
   <Row title={tr("s.version")} detail={updateLine}>
     <span class="dim">{app.view!.version}</span>
     {#if app.view!.update.available}
-      <button class="btn primary" onclick={() => call("openUpdate", "download")}>{tr("s.download", { v: app.view!.update.available.version })}</button>
+      <button class="btn primary" onclick={() => call("installUpdate")} disabled={app.view!.update.install === "downloading" || app.view!.update.install === "restarting"}>
+        {app.view!.update.install === "downloading" ? tr("s.installing") : app.view!.update.install === "restarting" ? tr("s.restarting") : tr("s.installUpdate", { v: app.view!.update.available.version })}
+      </button>
     {:else}
       <button class="btn" onclick={() => call("checkUpdates")} disabled={app.view!.update.status === "checking"}>{tr("s.checkNow")}</button>
     {/if}

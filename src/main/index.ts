@@ -6,6 +6,9 @@ import { Controller } from "../app/controller";
 import { buildReport } from "../app/export";
 import { safeUninstall } from "../app/uninstall";
 import { checkForUpdate } from "../adapters/update-check";
+import { prepareUpdate, swapScript } from "../app/updater";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { startCliServer } from "../app/cli-server";
 import { HelperClient } from "../adapters/helper-client";
 import { WardenClient, wardenPid } from "../adapters/warden-client";
@@ -140,6 +143,37 @@ const api: Api = {
   popoverHeight: (px) => setPopoverHeight(px),
   quit: () => void finish(),
   checkUpdates: () => runUpdateCheck(true),
+  installUpdate: async () => {
+    const u = controller.view().update.available;
+    if (!u) return { ok: false, error: "none" };
+    controller.setUpdate({ install: "downloading", installError: undefined });
+    const workDir = mkdtempSync(join(tmpdir(), "quietlink-update-"));
+    const r = await prepareUpdate(u, {
+      fetch,
+      workDir,
+      exec: async (argv) => {
+        const p = Bun.spawn(argv, { stdout: "pipe", stderr: "ignore" });
+        return { code: await p.exited, out: await new Response(p.stdout).text() };
+      },
+      readBundle: async (app) => {
+        const plist = join(app, "Contents/Info.plist");
+        const get = (k: string) => Bun.spawnSync(["/usr/bin/plutil", "-extract", k, "raw", plist]).stdout.toString().trim();
+        return { id: get("CFBundleIdentifier"), version: get("CFBundleVersion") };
+      },
+    });
+    if (!r.ok) {
+      controller.setUpdate({ install: "error", installError: r.error });
+      return { ok: false, error: r.error };
+    }
+    const trashed = join(homedir(), ".Trash", `Quietlink ${pkg.version}-${Date.now()}.app`);
+    const script = join(workDir, "swap.sh");
+    writeFileSync(script, swapScript(process.pid, appBundle, r.staged, trashed));
+    // New session so the swap survives this process (and its launcher) quitting.
+    Bun.spawn(["/usr/bin/perl", "-MPOSIX", "-e", "POSIX::setsid(); exec '/bin/bash', $ARGV[0]", script], { stdin: "ignore", stdout: "ignore", stderr: "ignore" }).unref();
+    controller.setUpdate({ install: "restarting" });
+    setTimeout(() => void finish(), 500);
+    return { ok: true };
+  },
   openUpdate: (kind) => {
     const u = controller.view().update.available;
     const url = kind === "download" ? u?.download ?? u?.page : u?.page;
@@ -198,6 +232,7 @@ const cli = startCliServer(cliSock, {
   resume: () => void controller.resume(),
   test: () => controller.startQuietTest(),
   settings: () => showSettings(),
+  update: () => void api.installUpdate(),
 });
 
 // Update check: at launch and daily, unless turned off in Settings. Only a notice;

@@ -61,14 +61,14 @@ That is the entire root surface: two exact commands, no wildcards, and no daemon
 
 1. Download `Quietlink-<version>-macos-arm64.zip` from [Releases](https://github.com/Ionmi/quietlink/releases) and unzip it.
 2. Move `Quietlink.app` to `/Applications`.
-3. The first time, right-click it and choose **Open**: releases aren't signed with an Apple Developer ID yet, so macOS asks for confirmation once. (Alternatively: `xattr -dr com.apple.quarantine /Applications/Quietlink.app`.)
+3. The first time, right-click it and choose **Open**: releases aren't signed with an Apple Developer ID, so macOS asks for confirmation once. (Alternatively: `xattr -dr com.apple.quarantine /Applications/Quietlink.app`.)
 4. Open the menu-bar panel → Settings → Permissions → **Allow…**
 
 ## Updates
 
-Quietlink checks GitHub for a newer release at launch and once a day (Settings → About; can be turned off) and shows a notice with a download link. To update, quit Quietlink, replace the app in `/Applications` and open it again; settings and permissions are kept.
+Quietlink checks GitHub for a newer release at launch and once a day (Settings → About; can be turned off). When there is one, **Install and restart** downloads it from this repository's releases, checks its SHA-256 and bundle id, swaps it into place (the old version goes to the Trash) and relaunches. Settings and permissions are kept.
 
-Fully automatic updates will come once releases are signed and notarized: an app that installs a system permission should never replace itself with an unsigned download.
+Releases are ad-hoc signed and not notarized, by design: the project doesn't use a paid Apple Developer ID. That's also why firewalls like LuLu ask again after each update.
 
 Maintainers: bump `version` in `package.json`, commit, then push a tag `vX.Y.Z`. The Release workflow checks the tag, runs the tests, builds and publishes the zip with its SHA-256.
 
@@ -85,7 +85,7 @@ bun run start
 
 Tests: `bun test` (domain, adapters, controller), `bun run test:helper` (warden core + sensor self-test), `bun run test:integration` (warden in dry-run: leases, crash recovery, SIGTERM, hang watchdog).
 
-If you use a firewall such as LuLu or Little Snitch, allow `quietlink-helper` to send ICMP. Otherwise Quietlink shows "all probes are failing". Until releases are Developer ID signed, the firewall asks again after each update.
+If you use a firewall such as LuLu or Little Snitch, allow `quietlink-helper` to send ICMP. Otherwise Quietlink shows "all probes are failing". Because releases aren't Developer ID signed, the firewall asks again after each update.
 
 ## Resource use
 
@@ -99,7 +99,7 @@ Verified on macOS 27 on Apple Silicon. Other macOS 14+ versions and Intel Macs s
 
 - Holding AWDL down with a 1-second loop *reduces* AWDL activity. It cannot stop macOS from using it for a moment between checks.
 - Other causes of cuts (firmware scans, roaming, a weak link, the ISP) are measured, not fixed.
-- Releases are ad-hoc signed, not notarized. Signed releases, automatic updates and an `SMAppService` daemon will come with a Developer ID.
+- Releases are ad-hoc signed and not notarized (no paid Apple Developer ID), so macOS asks for confirmation on first launch.
 
 ## Uninstall
 
