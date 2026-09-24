@@ -49,3 +49,4 @@ No measurable difference on this run: with the Mac on 6 GHz, AWDL caused no spik
 - Tag `v0.1.0` → Release workflow built and published `Quietlink-0.1.0-macos-arm64.zip` + SHA-256; downloaded, checksum OK, installed to /Applications, warden LaunchAgent repointed to the installed helper.
 - Tag `v0.1.1` → published; the installed 0.1.0 detected 0.1.1 at launch with the correct download URL.
 - Note: releases are ad-hoc signed, so firewalls such as LuLu ask again for each new version.
+- Self-update: installed 0.1.2 detected 0.1.3, `quietlink update` downloaded it, checked SHA-256 and bundle, quit, swapped the bundle (old one to the Trash), relaunched as 0.1.3 in ~4 s and reported "up to date". AWDL stayed up; warden kept pointing at the installed helper.
