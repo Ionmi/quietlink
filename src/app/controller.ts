@@ -157,6 +157,10 @@ export class Controller {
     this.timer = null;
     if (this.mode.token !== null) await this.d.warden.request({ op: "release", token: this.mode.token }).catch(() => {});
     await this.idle();
+    if (this.session) {
+      this.checkInterruptions();
+      this.closeSession();
+    }
     this.logStream?.stop();
     this.d.helper.stop();
     this.d.telemetry.flush();
@@ -727,7 +731,7 @@ export class Controller {
     };
     const status = this.d.warden.lastStatus;
     const since = now - HOUR;
-    const spark = gw ? this.ledger.series(gw, now - 5 * 60_000, now).slice(-300) : [];
+    const spark = gw ? downsample(this.ledger.series(gw, now - 5 * 60_000, now), 150) : [];
     return {
       phase: this.mode.phase,
       because: this.labels(),
@@ -762,4 +766,17 @@ export class Controller {
       settings: this.s,
     };
   }
+}
+
+/** Keeps the chart to ~n points over the whole window; each bucket keeps its worst sample (loss > max rtt). */
+function downsample(points: { t: number; rtt: number | null }[], n: number) {
+  if (points.length <= n) return points;
+  const size = points.length / n;
+  const out: { t: number; rtt: number | null }[] = [];
+  for (let i = 0; i < n; i++) {
+    const bucket = points.slice(Math.floor(i * size), Math.floor((i + 1) * size));
+    const lost = bucket.find((p) => p.rtt === null);
+    out.push(lost ?? bucket.reduce((a, b) => ((b.rtt ?? 0) > (a.rtt ?? 0) ? b : a)));
+  }
+  return out;
 }

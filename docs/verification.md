@@ -36,3 +36,10 @@ No measurable difference on this run: with the Mac on 6 GHz, AWDL caused no spik
 - A stand-in binary at the match path: quiet mode on in < 7 s (process snapshot every 2 s), AWDL down; after it exits, grace 10 s, then AWDL up.
 - A stand-in at the client path: no trigger.
 - Pending: confirm with a real match.
+
+## More checks (2026-09-24)
+
+- Wi-Fi reconnect recovery: warden SIGKILLed right after turning Wi-Fi off → launchd restarted it and Wi-Fi was back on after 0.5 s.
+- Call presets: bundle IDs of FaceTime, Microsoft Teams, Discord and Slack match the installed apps. Zoom opened without a meeting does not start `CptHost` (no false trigger); a real meeting is still to be checked. Webex not installed.
+- Input-device heuristic reads inactive with the Teams virtual audio device installed.
+- Resource use (Apple Silicon): app 73 MB, 0.7 % CPU idle / 1.1 % in quiet mode; sensor helper 17 MB, 1.4 % / 1.8 %; warden 4 MB, ~0 %.

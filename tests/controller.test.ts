@@ -445,3 +445,24 @@ test("manual off releases without grace", async () => {
   expect(warden.ops()).toContain("release");
   expect(ctl.view().phase).toBe("inactive");
 });
+
+test("quitting during an active session saves it", async () => {
+  const { ctl, helper } = setup();
+  helper.emit(lolProc());
+  await ctl.idle();
+  await ctl.stop();
+  expect(ctl.view().sessions).toHaveLength(1);
+});
+
+test("the latency chart covers the full 5 minutes, downsampled", async () => {
+  const { ctl, helper, now } = setup();
+  const t0 = now() - 5 * 60_000 + 1000;
+  for (let i = 0; i < 600; i++) {
+    helper.emit({ type: "probe-sent", target: "192.168.1.1", id: 8, seq: i + 1, ts: t0 + i * 500 });
+    helper.emit({ type: "probe-result", target: "192.168.1.1", id: 8, seq: i + 1, ts: t0 + i * 500 + 3, outcome: "reply", rttMs: i === 10 ? 90 : 3 });
+  }
+  const sp = ctl.view().sparkline;
+  expect(sp.length).toBeLessThanOrEqual(150);
+  expect(sp[0].t).toBeLessThan(t0 + 5000);
+  expect(sp.some((p) => p.rtt === 90)).toBe(true); // spikes survive downsampling
+});

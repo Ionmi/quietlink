@@ -72,6 +72,10 @@ Tests: `bun test` (domain, adapters, controller), `bun run test:helper` (warden 
 
 If you use a firewall such as LuLu or Little Snitch, allow `quietlink-helper` to send ICMP. Otherwise Quietlink shows "all probes are failing".
 
+## Resource use
+
+Measured on Apple Silicon: the app uses about 73 MB and under 1.5 % of one core, the sensor helper 17 MB and under 2 %, the warden 4 MB and practically nothing.
+
 ## Support
 
 Verified on macOS 27 on Apple Silicon. Other macOS 14+ versions and Intel Macs should work but are untested. The unified-log parser for "Explain cuts" is enabled only for macOS versions with test fixtures (27).
