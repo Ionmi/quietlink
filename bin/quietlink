@@ -1,0 +1,31 @@
+#!/usr/bin/env bun
+// Quietlink CLI: talks to the running app over its local socket.
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+const sock = join(process.env.QUIETLINK_SUPPORT_DIR ?? join(homedir(), "Library/Application Support/Quietlink"), "cli.sock");
+const [cmd = "status", arg] = process.argv.slice(2);
+const usage = "usage: quietlink status | on [minutes] | off | pause | resume | test";
+if (!["status", "on", "off", "pause", "resume", "test"].includes(cmd)) {
+  console.error(usage);
+  process.exit(2);
+}
+let buf = "";
+let resolve!: (v: any) => void;
+const done = new Promise<any>((r) => (resolve = r));
+try {
+  const s = await Bun.connect({ unix: sock, socket: { data(_s, d) { buf += d.toString(); if (buf.includes("\n")) resolve(JSON.parse(buf)); } } });
+  s.write(JSON.stringify({ cmd, minutes: arg ? Number(arg) : undefined }) + "\n");
+  const r = await Promise.race([done, Bun.sleep(3000).then(() => ({ ok: false, error: "timeout" }))]);
+  s.end();
+  if (!r.ok) { console.error(`quietlink: ${r.error}`); process.exit(1); }
+  if (cmd === "status") {
+    const st = r.status;
+    console.log(`quiet mode: ${st.phase}${st.because?.length ? ` (${st.because.join(", ")})` : ""}`);
+    if (st.wifi) console.log(`wi-fi: ${st.wifi.band ?? "—"} GHz ch ${st.wifi.channel ?? "—"} · router ${st.ping?.gw ?? "—"} ms · loss ${st.lossPct ?? "—"} %`);
+    console.log(`interruptions (1 h): ${st.interruptionsLastHour}`);
+  } else console.log("ok");
+} catch {
+  console.error("quietlink: the app is not running");
+  process.exit(1);
+}
