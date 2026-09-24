@@ -1,25 +1,34 @@
 import { Tray } from "electrobun/main";
-import type { TrayState } from "./tray-state";
 export { trayState, type TrayState } from "./tray-state";
 
+type Bounds = { x: number; y: number; width: number; height: number };
+
+/**
+ * The menu-bar item is a single rendered template image (crescent, ping, stacked
+ * rates). Its width only changes when the displayed fields change in Settings.
+ */
 export class TrayController {
   private tray: Tray;
-  private state: TrayState = "idle";
-  private title = "";
+  private width = 18;
 
-  constructor(onClick: (bounds: { x: number; y: number; width: number; height: number }) => void) {
-    this.tray = new Tray({ image: "views://tray/tray-idle.png", template: true, width: 18, height: 18 });
-    this.tray.on("tray-clicked", () => onClick(this.tray.getBounds()));
+  constructor(private onClick: (bounds: Bounds) => void) {
+    this.tray = this.create("views://tray/tray-idle.png", 18);
   }
 
-  update(state: TrayState, title: string) {
-    if (state !== this.state) {
-      this.state = state;
-      this.tray.setImage(`views://tray/tray-${state}.png`);
-    }
-    if (title !== this.title) {
-      this.title = title;
-      this.tray.setTitle(title);
+  private create(image: string, width: number) {
+    const tray = new Tray({ image, template: true, width, height: 22 });
+    tray.on("tray-clicked", () => this.onClick(tray.getBounds()));
+    return tray;
+  }
+
+  showImage(path: string, width: number) {
+    const w = Math.round(width);
+    if (w !== this.width) {
+      this.tray.remove();
+      this.tray = this.create(path, w);
+      this.width = w;
+    } else {
+      this.tray.setImage(path);
     }
   }
 

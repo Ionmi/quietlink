@@ -34,3 +34,8 @@ func orNull<T>(_ v: T?) -> Any { v.map { $0 as Any } ?? NSNull() }
 func logError(_ s: String) {
   FileHandle.standardError.write((s + "\n").data(using: .utf8)!)
 }
+
+/// Blocks until queued output is written (one-shot modes exit right after emitting).
+func flushOutput() {
+  outputQueue.sync {}
+}

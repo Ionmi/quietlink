@@ -19,6 +19,13 @@ if args.contains("--test-warden") {
   exit(runWardenTests())
 }
 
+if let i = args.firstIndex(of: "--render-tray"), i + 1 < args.count,
+   let data = args[i + 1].data(using: .utf8), let cmd = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+  TrayRenderer.handle(cmd)
+  flushOutput()
+  exit(0)
+}
+
 if args.contains("--selftest") {
   exit(runSelftest())
 }

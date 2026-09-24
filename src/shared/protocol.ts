@@ -21,6 +21,7 @@ export type HelperEvent =
   | { v: 1; type: "power"; ts: number; state: "will-sleep" | "did-wake" }
   | { v: 1; type: "net-change"; ts: number }
   | { v: 1; type: "traffic"; ts: number; iface: string; rxBytes: number; txBytes: number }
+  | { v: 1; type: "tray-image"; ts: number; path: string; width: number; height: number }
   | { v: 1; type: "procs"; ts: number; procs: ProcInfo[] }
   | ({ v: 1; type: "proc-launch" | "proc-exit"; ts: number } & ProcInfo)
   | { v: 1; type: "input-active"; ts: number; active: boolean | null }
@@ -32,7 +33,8 @@ export type HelperEvent =
 export type HelperCommand =
   | { v: 1; cmd: "probe-start"; target: string; iface: string; intervalMs: number }
   | { v: 1; cmd: "probe-stop"; target: string }
-  | { v: 1; cmd: "snapshot" };
+  | { v: 1; cmd: "snapshot" }
+  | { v: 1; cmd: "render-tray"; path: string; state: "idle" | "quiet" | "warn"; ping?: string; up?: string; down?: string };
 
 export type WardenStatus = {
   awdlUp: boolean | null; holding: boolean; tookDown: boolean; recovering: boolean;

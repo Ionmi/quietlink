@@ -11,6 +11,7 @@ func runSensor() -> Never {
   let traffic = TrafficSensor(iface: { CWWiFiClientInterfaceName() })
   SensorHooks.starters.append { procs.start(); input.start(); traffic.start() }
   SensorHooks.handlers.append { name, cmd in probers.handle(name, cmd) }
+  SensorHooks.handlers.append { name, cmd in if name == "render-tray" { TrayRenderer.handle(cmd) } }
   var lastIface: String? = CWWiFiClientInterfaceName()
   power.onNetChange = {
     lastIface = CWWiFiClientInterfaceName()
