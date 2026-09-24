@@ -243,3 +243,72 @@ test("all probes to router and external lost → probes-blocked hint (e.g. firew
   expect(ctl.view().probesBlocked).toBe(true);
   expect(ctl.view().interruptionsLastHour).toBe(0);
 });
+
+test("a hold answered after stop is released immediately and does not activate", async () => {
+  const { ctl, helper, warden } = setup();
+  let release!: (r: any) => void;
+  const orig = warden.request.bind(warden);
+  warden.request = async (req: any) => (req.op === "hold" ? new Promise((r) => (release = r)) : orig(req));
+  helper.emit(lolProc());
+  const stopping = ctl.stop();
+  release({ v: 1, id: 0, ok: true, token: 555 });
+  await stopping;
+  await ctl.idle();
+  warden.request = orig;
+  expect(ctl.view().phase).not.toBe("active");
+  expect(warden.log).toContainEqual({ op: "release", token: 555 });
+});
+
+test("probe traffic does not keep a stale game lease alive", async () => {
+  const { ctl, helper, advance } = setup();
+  helper.emit(lolProc());
+  await ctl.idle();
+  for (let i = 0; i < 32; i++) {
+    helper.emit({ type: "probe-sent", target: "192.168.1.1", id: 3, seq: i + 1, ts: 1_000_000 + i * 1000 });
+    await advance(1000);
+  }
+  expect(ctl.view().because).toEqual([]);
+});
+
+test("wake does not resurrect leases from the pre-sleep process snapshot", async () => {
+  const { ctl, helper, warden } = setup();
+  helper.emit(lolProc());
+  await ctl.idle();
+  helper.emit({ type: "power", state: "will-sleep" });
+  helper.emit({ type: "power", state: "did-wake" });
+  await ctl.idle();
+  expect(warden.ops().filter((o) => o === "hold")).toHaveLength(1);
+  expect(ctl.view().because).toEqual([]);
+});
+
+test("handing a running quiet test over to a game opens a session", async () => {
+  const { ctl, helper, advance } = setup();
+  ctl.startQuietTest();
+  for (let i = 0; i < 62; i++) await advance(1000);
+  for (let i = 0; i < 5; i++) await advance(1000);
+  helper.emit(lolProc());
+  await ctl.idle();
+  await advance(1000);
+  helper.emit({ type: "procs", procs: [] });
+  await advance(11_000);
+  await advance(1000);
+  expect(ctl.view().sessions).toHaveLength(1);
+});
+
+test("interruptions are attributed by timestamp; final one counted before close", async () => {
+  const { ctl, helper, advance } = setup();
+  ctl.manual(true);
+  await ctl.idle();
+  const t0 = 1_000_000;
+  let seq = 0;
+  const probe = (ts: number, outcome: "reply" | "lost") => {
+    seq++;
+    helper.emit({ type: "probe-sent", target: "192.168.1.1", id: 9, seq, ts });
+    helper.emit({ type: "probe-result", target: "192.168.1.1", id: 9, seq, ts: ts + (outcome === "reply" ? 3 : 1000), outcome, rttMs: outcome === "reply" ? 3 : undefined });
+  };
+  probe(t0 + 100, "reply"); probe(t0 + 600, "lost"); probe(t0 + 1100, "lost"); probe(t0 + 1600, "reply");
+  ctl.manual(false);
+  await advance(10_500);
+  await advance(1000);
+  expect(ctl.view().sessions[0]?.interruptions).toBe(1);
+});

@@ -9,6 +9,8 @@ final class WardenExecutor {
   private let admission = NSLock()
   private var fenced = false
   private var running: Process?
+  /// A timed-out command may still be running as root; no new command until it is gone.
+  private var orphaned = false
   /// QUIETLINK_DRY_RUN: commands are logged and AWDL state is simulated in memory.
   private let dryRun = ProcessInfo.processInfo.environment["QUIETLINK_DRY_RUN"] != nil
   private var simAwdlUp = true
@@ -30,6 +32,16 @@ final class WardenExecutor {
   var busy: Bool {
     admission.lock(); defer { admission.unlock() }
     return running != nil
+  }
+
+  /// Called every tick: reopens admission once a timed-out command is positively gone.
+  func pollOrphans() {
+    admission.lock(); defer { admission.unlock() }
+    guard orphaned else { return }
+    if running?.isRunning != true, commandProcessesVisible() == false {
+      running = nil
+      orphaned = false
+    }
   }
 
   /// Returns true on exit status 0 within the timeout. Refuses to start while a
@@ -62,10 +74,13 @@ final class WardenExecutor {
         kill(p.processIdentifier, SIGKILL)
         finished = done.wait(timeout: .now() + 1) == .success
       }
-      // The root grandchild may outlive sudo; wait until it is gone before admitting more.
+      // The root grandchild may outlive sudo: admission stays closed until no
+      // ifconfig/networksetup is visible (pollOrphans clears it later if needed).
       let deadline = Date().addingTimeInterval(3)
       while commandProcessesVisible() != false, Date() < deadline { usleep(50_000) }
-      admission.lock(); if !p.isRunning { running = nil }; admission.unlock()
+      admission.lock()
+      if !p.isRunning, commandProcessesVisible() == false { running = nil } else { orphaned = true }
+      admission.unlock()
       return false
     }
     admission.lock(); running = nil; admission.unlock()

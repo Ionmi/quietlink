@@ -92,7 +92,9 @@ export class Controller {
   private wifi: WifiEvent | null = null;
   private router: { iface: string | null; ipv4: string | null; mac: string | null } = { iface: null, ipv4: null, mac: null };
   private targets = new Map<string, { name: string; intervalMs: number }>();
-  private lastSensorAt: number;
+  private lastProcsAt: number;
+  private lastInputAt: number;
+  private stopped = false;
   private sleepingSince: number | null = null;
   private listeners = new Set<(v: AppView) => void>();
   private ops = new Set<Promise<unknown>>();
@@ -112,8 +114,8 @@ export class Controller {
 
   constructor(private d: Deps) {
     this.now = d.now ?? (() => Date.now());
-    this.lastSensorAt = this.now();
-    d.helper.on((e) => this.onHelperEvent(e));
+    this.lastProcsAt = this.lastInputAt = this.now();
+    d.helper.on((e) => { if (!this.stopped) this.onHelperEvent(e); });
     d.helper.onRestart(() => {
       this.ledger.onHelperRestart(this.now());
       this.resendProbes(true);
@@ -135,9 +137,11 @@ export class Controller {
   }
 
   async stop() {
+    this.stopped = true; // no more sensor or timer work; late hold tokens are released
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     if (this.mode.token !== null) await this.d.warden.request({ op: "release", token: this.mode.token }).catch(() => {});
+    await this.idle();
     this.logStream?.stop();
     this.d.helper.stop();
     this.d.telemetry.flush();
@@ -202,13 +206,19 @@ export class Controller {
   private effect(e: Effect) {
     const gen = this.mode.generation;
     switch (e.kind) {
-      case "hold":
+      case "hold": {
+        const qtRun = this.qtRunning() ? this.qt.run : null;
         this.track(
           this.d.warden.request({ op: "hold", ttlMs: 4000 }).then(
             (r) => {
               if (r.ok && r.token !== undefined) {
+                if (this.stopped) {
+                  this.track(this.d.warden.request({ op: "release", token: r.token }).catch(() => {}));
+                  return;
+                }
                 this.input({ kind: "hold-ok", generation: e.generation, token: r.token });
-                if (this.qtRunning() && this.leases.has("test")) this.qtInput({ kind: "hold-ack", run: this.qt.run, now: this.now() });
+                const accepted = this.mode.token === r.token && this.mode.generation === e.generation;
+                if (accepted && qtRun !== null && this.qt.run === qtRun && this.leases.has("test")) this.qtInput({ kind: "hold-ack", run: qtRun, now: this.now() });
               } else {
                 const err = r.ok ? "no-token" : r.error;
                 this.input({ kind: "hold-failed", generation: e.generation, error: err, now: this.now() });
@@ -220,6 +230,7 @@ export class Controller {
           ),
         );
         break;
+      }
       case "renew":
         this.track(
           this.d.warden.request({ op: "renew", token: e.token }).then(
@@ -230,6 +241,9 @@ export class Controller {
         break;
       case "release":
         if (e.token === null) break; // the late hold-ok will carry the token to release
+        // The warden owns restoration: once it has dropped the lease it retries `up`
+        // itself (status.lastError shows failures), and an unreachable warden lets the
+        // dead-man lease expire. Either way this lease is over for the app.
         this.track(this.d.warden.request({ op: "release", token: e.token }).then(() => this.input({ kind: "released", generation: e.generation }), () => this.input({ kind: "released", generation: e.generation })));
         break;
       case "restore-now":
@@ -238,7 +252,7 @@ export class Controller {
       case "rebuild-leases":
         for (const l of this.leases.all()) if (l.sensorBound) this.leases.remove(l.id);
         this.mode = { ...this.mode, leases: 0 };
-        this.reconcileLeases();
+        this.reconcileLeases(); // only fresh snapshots contribute (stale ones are cleared)
         break;
     }
   }
@@ -249,14 +263,23 @@ export class Controller {
 
   private phaseChanged(before: Phase) {
     if (this.quietPhase() !== this.quietPhase(before)) this.resendProbes();
-    const onlyTest = this.leases.all().every((l) => l.source === "test");
-    if (this.mode.phase === "active" && !this.session && !onlyTest) {
+    this.reconcileSession();
+  }
+
+  /** A session exists exactly while quiet mode is held for a non-test reason. */
+  private reconcileSession() {
+    const owned = (this.mode.phase === "active" || this.mode.phase === "grace" || this.mode.phase === "airdrop-break") && this.leases.all().some((l) => l.source !== "test");
+    if (owned && !this.session) {
       this.session = {
-        start: this.now(), triggers: new Set(this.labels()), hist: new Histogram(), max: null, spikes: 0, sent: 0, lost: 0,
-        interruptions: 0, reenables0: this.d.warden.lastStatus?.["reenables" as keyof WardenStatus] as number ?? 0, notes: [],
+        start: this.now(), triggers: new Set(this.labels().filter((l) => l !== this.tr("lease.test"))), hist: new Histogram(), max: null, spikes: 0, sent: 0, lost: 0,
+        interruptions: 0, reenables0: (this.d.warden.lastStatus as any)?.reenables ?? 0, notes: [],
       };
+    } else if (owned && this.session) {
+      for (const l of this.leases.all()) if (l.source !== "test") this.session.triggers.add(l.label);
+    } else if (!owned && this.session) {
+      this.checkInterruptions(); // finalize events before summarizing
+      this.closeSession();
     }
-    if (this.mode.phase === "inactive" && this.session) this.closeSession();
   }
 
   private closeSession() {
@@ -438,9 +461,9 @@ export class Controller {
   // ---------- helper events ----------
 
   private onHelperEvent(e: HelperEvent) {
-    this.lastSensorAt = this.now();
     switch (e.type) {
       case "procs":
+        this.lastProcsAt = this.now();
         this.procs = e.procs;
         this.reconcileLeases();
         return;
@@ -453,6 +476,7 @@ export class Controller {
         this.reconcileLeases();
         return;
       case "input-active":
+        this.lastInputAt = this.now();
         this.inputActive = e.active;
         this.reconcileLeases();
         return;
@@ -481,6 +505,9 @@ export class Controller {
         } else {
           if (this.sleepingSince !== null) this.ledger.onPause(this.sleepingSince, this.now());
           this.sleepingSince = null;
+          // Pre-sleep snapshots are stale: leases are rebuilt only from fresh sensor data.
+          this.procs = [];
+          this.inputActive = null;
           this.input({ kind: "wake", now: this.now() });
         }
         return;
@@ -522,11 +549,16 @@ export class Controller {
   // ---------- tick ----------
 
   async tick() {
+    if (this.stopped) return;
     const now = this.now();
     this.d.helper.checkHealth();
-    const gone = this.leases.expireUnknown(now, this.lastSensorAt, 30_000);
-    if (gone.length) this.mode = { ...this.mode };
+    // Sensor freshness is tracked per sensor: probe traffic never keeps triggers alive.
+    let stale = false;
+    if (now - this.lastProcsAt > 30_000 && this.procs.length) { this.procs = []; stale = true; }
+    if (now - this.lastInputAt > 30_000 && this.inputActive !== null) { this.inputActive = null; stale = true; }
+    if (stale) this.reconcileLeases();
     this.leasesChanged();
+    this.checkInterruptions();
     this.input({ kind: "tick", now });
 
     if (this.qtRunning()) {
@@ -550,7 +582,7 @@ export class Controller {
       if (b.count || b.lost || b.late) this.d.telemetry.addSecond({ ts: now, target: this.targets.get(target)?.name ?? target, count: b.count, sum: b.sum, min: b.count ? b.min : 0, max: b.max, lost: b.lost, late: b.late });
     }
     this.secondAcc.clear();
-    this.checkInterruptions();
+    this.reconcileSession();
     if (now - this.lastPrune > HOUR) {
       this.d.telemetry.prune(now);
       this.lastPrune = now;
@@ -574,7 +606,7 @@ export class Controller {
       this.events.unshift({ ts: it.start, kind: "interruption", text: `≈${(durationMs / 1000).toFixed(1)} s`, durationMs, resolutionMs: it.resolutionMs, note: noteText });
       this.events = this.events.slice(0, 50);
       this.d.telemetry.addEvent({ ts: it.start, kind: "interruption", data: { durationMs, lostCount: it.lostCount, resolutionMs: it.resolutionMs, note: note?.text ?? null } });
-      if (this.session) {
+      if (this.session && it.start >= this.session.start) {
         this.session.interruptions++;
         if (noteText) this.session.notes.push(noteText);
         if (this.policy.allow("cut", this.now()))

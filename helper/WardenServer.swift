@@ -67,12 +67,14 @@ final class WardenServer {
 
   private func recover(started: Double) {
     progress()
-    let busy = commandProcessesVisible()
-    if busy != false && monotonicMs() - started < 10_000 {
+    // Recovery never proceeds while a command process may still be running: a late
+    // orphaned `down` must not land after the restore is confirmed.
+    if commandProcessesVisible() != false {
+      if monotonicMs() - started >= 10_000 { lastError = "waiting for a previous command to finish" }
+      publishStatus()
       main.asyncAfter(deadline: .now() + 0.25) { self.recover(started: started) }
       return
     }
-    if busy != false { lastError = "recovery barrier timed out" }
     let cmds = core.startup(state: core.persisted, bootId: bootSessionId(), now: now())
     execute(cmds)
     converge(checks: 0)
@@ -101,6 +103,7 @@ final class WardenServer {
   private func tick() {
     progress()
     defer { publishStatus() }
+    exec.pollOrphans()
     if core.recovering { return }
     execute(core.tick(now: now(), awdlUp: exec.awdlUp()))
     if core.restorePending, let at = upRetryAt, monotonicMs() >= at { execute([.up]) }
@@ -307,6 +310,18 @@ final class WardenServer {
     var out: [String: Any] = ["v": protocolVersion, "id": reply.id, "ok": reply.ok]
     if let t = reply.token { out["token"] = t }
     if let e = reply.error { out["error"] = e }
+    if reply.ok, !ok {
+      switch req {
+      case .reconnectWifi:
+        // Nothing changed yet if persisting the intent failed: roll it back.
+        if exec.wifiPowerOn(core.persisted.pendingWifiOn) == true { execute(core.wifiObserved(on: true)); core.cancelReconnect() }
+        out = ["v": protocolVersion, "id": req.id, "ok": false, "error": "command-failed", "detail": lastError ?? "reconnect failed"]
+      case .release, .restoreNow:
+        // Lease is gone; the warden keeps retrying `up` on its own (restorePending).
+        out = ["v": protocolVersion, "id": req.id, "ok": false, "error": "command-failed", "detail": lastError ?? "restore failed; retrying"]
+      default: break
+      }
+    }
     if case .hold = req, reply.ok, !ok || exec.awdlUp() == true && core.persisted.tookDown {
       // Persist or down failed: report it and give the lease back.
       execute(core.handle(.restoreNow(id: req.id), now: now(), awdlUp: exec.awdlUp()).1)

@@ -160,6 +160,11 @@ struct WardenCore {
     return []
   }
 
+  /// Reconnect intent could not be persisted before any change: forget it.
+  mutating func cancelReconnect() {
+    persisted.pendingWifiOn = nil
+  }
+
   mutating func wifiObserved(on: Bool) -> [WardenCommand] {
     guard on, persisted.pendingWifiOn != nil else { return [] }
     persisted.pendingWifiOn = nil
