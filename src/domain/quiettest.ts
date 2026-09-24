@@ -33,7 +33,7 @@ export type QTEffect =
 
 export const TEST_PROBE_MS = 200;
 export const BLOCKS = 4;
-export const initialQT: QTState = { phase: "idle", block: 0, blockStart: null, holdAcked: false, results: [] };
+export const initialQT: QTState = { phase: "idle", block: 0, blockStart: null, holdAcked: false, results: [], baseline: null };
 
 type Out = { state: QTState; effects: QTEffect[] };
 const RUNNING: QTPhase[] = ["arming-A", "A", "arming-B", "B"];
