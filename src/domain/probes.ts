@@ -88,6 +88,16 @@ export class ProbeLedger {
     };
   }
 
+  /** Settled probes sent within [from, to]; used for Quiet test blocks. */
+  range(target: string, from: number, to: number) {
+    const rs = [...this.records(target).values()].filter((r) => r.sentAt >= from && r.sentAt <= to && (r.outcome === "reply" || r.outcome === "lost"));
+    return {
+      sent: rs.length,
+      lost: rs.filter((r) => r.outcome === "lost").length,
+      replies: rs.filter((r) => r.outcome === "reply").sort((a, b) => a.sentAt - b.sentAt).map((r) => r.rttMs ?? 0),
+    };
+  }
+
   /**
    * Runs of >= 2 consecutive deadline losses. Anything that is not a deadline loss
    * (error, unknown, paused, gap across a pause) breaks the run, so losses are

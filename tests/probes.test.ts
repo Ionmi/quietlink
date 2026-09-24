@@ -132,3 +132,12 @@ test("losses on opposite sides of sleep do not merge", () => {
   l2.onEvent(sent(2, 6000)); l2.onEvent(res(2, 7000, "lost"));
   expect(l2.interruptions("gw")).toEqual([]);
 });
+
+test("range summarizes probes sent inside a time window", () => {
+  const l = L();
+  l.onEvent(sent(1, 0)); l.onEvent(res(1, 3, "reply", 3));
+  l.onEvent(sent(2, 500)); l.onEvent(res(2, 540, "reply", 40));
+  l.onEvent(sent(3, 1000)); l.onEvent(res(3, 2000, "lost"));
+  l.onEvent(sent(4, 1500)); l.onEvent(res(4, 1505, "reply", 5));
+  expect(l.range("gw", 400, 1200)).toMatchObject({ sent: 2, lost: 1, replies: [40] });
+});
