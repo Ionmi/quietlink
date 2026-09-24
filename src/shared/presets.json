@@ -1,1 +1,20 @@
-{ "version": 1, "rules": [] }
+{
+  "version": 1,
+  "rules": [
+    { "id": "lol", "label": "League of Legends (match)", "kind": "game",
+      "match": { "executable": "League of Legends.app/Contents/MacOS/League of Legends" },
+      "exclude": ["LeagueClient", "LeagueClientUx", "Riot Client"], "enabled": true, "verified": false },
+    { "id": "zoom-meeting", "label": "Zoom meeting", "kind": "call",
+      "match": { "executable": "CptHost.app/Contents/MacOS/CptHost" }, "enabled": true, "verified": false },
+    { "id": "facetime", "label": "FaceTime (with microphone)", "kind": "call",
+      "match": { "bundleId": "com.apple.FaceTime" }, "requireInput": true, "enabled": false, "verified": false },
+    { "id": "teams", "label": "Microsoft Teams (with microphone)", "kind": "call",
+      "match": { "bundleId": "com.microsoft.teams2" }, "requireInput": true, "enabled": false, "verified": false },
+    { "id": "discord", "label": "Discord (with microphone)", "kind": "call",
+      "match": { "bundleId": "com.hnc.Discord" }, "requireInput": true, "enabled": false, "verified": false },
+    { "id": "slack", "label": "Slack (with microphone)", "kind": "call",
+      "match": { "bundleId": "com.tinyspeck.slackmacgap" }, "requireInput": true, "enabled": false, "verified": false },
+    { "id": "webex", "label": "Webex (with microphone)", "kind": "call",
+      "match": { "bundleId": "Cisco-Systems.Spark" }, "requireInput": true, "enabled": false, "verified": false }
+  ]
+}
