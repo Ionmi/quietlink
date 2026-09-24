@@ -12,6 +12,7 @@ func runSensor() -> Never {
   SensorHooks.starters.append { procs.start(); input.start(); traffic.start() }
   SensorHooks.handlers.append { name, cmd in probers.handle(name, cmd) }
   SensorHooks.handlers.append { name, cmd in if name == "render-tray" { TrayRenderer.handle(cmd) } }
+  SensorHooks.handlers.append { name, cmd in if name == "watch-clicks" { ClickWatcher.set(cmd["on"] as? Bool ?? false) } }
   var lastIface: String? = CWWiFiClientInterfaceName()
   power.onNetChange = {
     lastIface = CWWiFiClientInterfaceName()

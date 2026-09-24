@@ -14,6 +14,24 @@ let invoke: Invoke = () => { throw new Error("not configured"); };
 let quitting = false;
 let shownAt = 0;
 let hiddenAt = 0;
+let visible = false;
+let frame: Rect | null = null;
+let onVisibility: (open: boolean) => void = () => {};
+
+export function onPopoverVisibility(fn: (open: boolean) => void) {
+  onVisibility = fn;
+}
+
+export function popoverState() {
+  return { visible, frame };
+}
+
+function setVisible(v: boolean) {
+  if (v === visible) return;
+  visible = v;
+  if (!v) hiddenAt = Date.now();
+  onVisibility(v);
+}
 
 export function configureWindows(fn: Invoke) {
   invoke = fn;
@@ -64,10 +82,7 @@ function createPopover() {
   // The status-item click can steal focus back right after show(); ignore blurs
   // in that short window so the popover doesn't close itself on open.
   win.on("blur", () => {
-    if (Date.now() - shownAt > 400) {
-      win.hide();
-      hiddenAt = Date.now();
-    }
+    if (Date.now() - shownAt > 400) hidePopover();
   });
   win.on("will-close", (event: any) => {
     if (!quitting) {
@@ -84,17 +99,20 @@ function createPopover() {
 }
 
 export function togglePopover(tray: Rect, screens: Screen[]) {
-  // Clicking the item while the popover is open first blurs (hides) it; don't reopen.
+  if (visible) return hidePopover();
+  // A click on the item that already closed the popover (blur/outside click) must not reopen it.
   if (Date.now() - hiddenAt < 300) return;
   const win = createPopover();
   const f = popoverFrame(tray, screens, { width: POPOVER.width, height: popoverHeight });
   lastFrame = { x: f.x, y: f.y };
+  frame = f;
   win.setFrame(f.x, f.y, f.width, f.height);
   win.setAlwaysOnTop(true);
   win.setVisibleOnAllWorkspaces(true);
   shownAt = Date.now();
   win.show();
   win.activate();
+  setVisible(true);
 }
 
 /** The view reports its content height; the window follows (top edge fixed). */
@@ -103,10 +121,12 @@ export function setPopoverHeight(px: number) {
   if (h === popoverHeight) return;
   popoverHeight = h;
   if (popover && lastFrame) popover.setFrame(lastFrame.x, lastFrame.y, POPOVER.width, h);
+  if (frame) frame = { ...frame, height: h };
 }
 
 export function hidePopover() {
   popover?.hide();
+  setVisible(false);
 }
 
 export function showSettings() {

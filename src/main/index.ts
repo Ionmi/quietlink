@@ -15,7 +15,8 @@ import { LogStream } from "../adapters/log-stream";
 import * as privilege from "../adapters/privilege";
 import { WARDEN_LABEL, LOGIN_LABEL, agentInstalled, installAgent, loginPlist, removeAgent, wardenPlist } from "../adapters/launch-agents";
 import { appSupport, cliSock, dbPath, ensureAppSupport, helperBinary, instanceLockPath, keyPath, settingsPath } from "../adapters/paths";
-import { configureWindows, broadcast, hidePopover, setPopoverHeight, setQuitting, showSettings, togglePopover } from "./windows";
+import { configureWindows, broadcast, hidePopover, onPopoverVisibility, popoverState, setPopoverHeight, setQuitting, showSettings, togglePopover } from "./windows";
+import { containsCocoaPoint } from "./geometry";
 import { trayState } from "./tray-state";
 import { trayImageSpec } from "../domain/menubar";
 import { dispatch, type Api } from "./rpc-api";
@@ -142,9 +143,18 @@ configureWindows((method, args) => dispatch(api, method, args));
 // The menu-bar item is a native NSStatusItem owned by the helper (template image,
 // tinted by macOS). The app only sends what to show and receives clicks.
 let lastSpec = "";
+let screens: { x: number; y: number; width: number; height: number }[] = [];
 helper.on((e) => {
-  if (e.type === "tray-clicked") togglePopover({ x: e.x, y: e.y, width: e.width, height: e.height }, e.screens);
+  if (e.type === "tray-clicked") {
+    screens = e.screens;
+    togglePopover({ x: e.x, y: e.y, width: e.width, height: e.height }, e.screens);
+  } else if (e.type === "mouse-down") {
+    // Outside click closes the popover (it may never receive a blur).
+    const { visible, frame } = popoverState();
+    if (visible && frame && screens.length && !containsCocoaPoint(frame, e, screens)) hidePopover();
+  }
 });
+onPopoverVisibility((open) => helper.send({ v: 1, cmd: "watch-clicks", on: open }));
 helper.onRestart(() => {
   lastSpec = "";
   renderTray(controller.view());

@@ -1,6 +1,13 @@
 export type Rect = { x: number; y: number; width: number; height: number };
 export type Screen = { x: number; y: number; width: number; height: number };
 
+/** True if a Cocoa-coordinate point lies inside a top-left-coordinate rect. */
+export function containsCocoaPoint(rect: Rect, p: { x: number; y: number }, screens: Screen[]): boolean {
+  const main = screens[0];
+  const top = main.y + main.height - p.y;
+  return p.x >= rect.x && p.x <= rect.x + rect.width && top >= rect.y && top <= rect.y + rect.height;
+}
+
 /**
  * Electrobun returns tray bounds in Cocoa coordinates (origin bottom-left of the
  * main screen, y up) but positions windows in top-left coordinates (y down).
