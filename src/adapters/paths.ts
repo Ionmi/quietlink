@@ -22,7 +22,8 @@ export function ensureAppSupport(dir = appSupport): string {
 
 /** Helper binary inside the app bundle, or the dev build. */
 export function helperBinary(): string {
-  const bundled = join(import.meta.dir, "..", "helper", "quietlink-helper");
+  const inBundle = "Quietlink Helper.app/Contents/MacOS/quietlink-helper";
+  const bundled = join(import.meta.dir, "..", "helper", inBundle);
   if (existsSync(bundled)) return bundled;
-  return join(import.meta.dir, "../../build/helper/quietlink-helper");
+  return join(import.meta.dir, "../../build/helper", inBundle);
 }

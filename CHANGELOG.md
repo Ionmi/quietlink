@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 — 2026-09-24
+- Router probes work with macOS Local Network privacy: the helper is its own app bundle with a usage description, builds and installed updates are signed with a local self-signed identity so permissions survive updates, and a `/sbin/ping` fallback kicks in if access is still refused.
+- The panel explains when macOS blocks access to the router and opens the right setting.
+
 ## 0.1.3 — 2026-09-24
 - First update delivered by the in-app installer.
 

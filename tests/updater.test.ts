@@ -56,3 +56,9 @@ test("[update] swap script waits for the app, keeps the old version in the Trash
   expect(() => swapScript(1, "/Applications/Quiet\"link.app", "/tmp/a.app", "/tmp/b.app")).toThrow();
   expect(() => swapScript(1, "/Applications/NotAnApp", "/tmp/a.app", "/tmp/b.app")).toThrow();
 });
+
+test("[update] a failed local re-sign stops the update", async () => {
+  const { d } = deps();
+  const r = await prepareUpdate(update, { ...d, sign: async () => false });
+  expect(r).toEqual({ ok: false, error: "sign" });
+});

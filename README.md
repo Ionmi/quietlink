@@ -68,7 +68,7 @@ That is the entire root surface: two exact commands, no wildcards, and no daemon
 
 Quietlink checks GitHub for a newer release at launch and once a day (Settings → About; can be turned off). When there is one, **Install and restart** downloads it from this repository's releases, checks its SHA-256 and bundle id, swaps it into place (the old version goes to the Trash) and relaunches. Settings and permissions are kept.
 
-Releases are ad-hoc signed and not notarized, by design: the project doesn't use a paid Apple Developer ID. That's also why firewalls like LuLu ask again after each update.
+Releases are ad-hoc signed and not notarized, by design: the project doesn't use a paid Apple Developer ID. To keep macOS permissions (Local Network) and firewall rules across updates anyway, Quietlink re-signs each verified update on your Mac with a local, self-signed "Quietlink Local" certificate from your login keychain before installing it, so the app keeps the same identity. Builds from source are signed with it too. If macOS still refuses access to your router, Quietlink falls back to the system's `ping` and tells you in the panel.
 
 Maintainers: bump `version` in `package.json`, commit, then push a tag `vX.Y.Z`. The Release workflow checks the tag, runs the tests, builds and publishes the zip with its SHA-256.
 
@@ -85,7 +85,7 @@ bun run start
 
 Tests: `bun test` (domain, adapters, controller), `bun run test:helper` (warden core + sensor self-test), `bun run test:integration` (warden in dry-run: leases, crash recovery, SIGTERM, hang watchdog).
 
-If you use a firewall such as LuLu or Little Snitch, allow `quietlink-helper` to send ICMP. Otherwise Quietlink shows "all probes are failing". Because releases aren't Developer ID signed, the firewall asks again after each update.
+If you use a firewall such as LuLu or Little Snitch, allow `quietlink-helper` to send ICMP. Otherwise Quietlink shows "all probes are failing". The first install asks once; later updates keep the same local signature.
 
 ## Resource use
 

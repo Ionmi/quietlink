@@ -8,9 +8,11 @@ type Deps = {
   workDir: string;
   exec(argv: string[]): Promise<{ code: number; out: string }>;
   readBundle(appPath: string): Promise<{ id: string; version: string }>;
+  /** Re-sign the verified bundle with this Mac's local identity (keeps permissions). */
+  sign?(appPath: string): Promise<boolean>;
 };
 
-export type Prepared = { ok: true; staged: string } | { ok: false; error: "source" | "download" | "checksum" | "unpack" | "bundle" };
+export type Prepared = { ok: true; staged: string } | { ok: false; error: "source" | "download" | "checksum" | "unpack" | "bundle" | "sign" };
 
 /**
  * Downloads the release zip and its .sha256 from this project's GitHub releases,
@@ -39,6 +41,7 @@ export async function prepareUpdate(u: Update, d: Deps): Promise<Prepared> {
   const staged = join(extract, "Quietlink.app");
   const b = await d.readBundle(staged).catch(() => null);
   if (!b || b.id !== "dev.quietlink.app" || b.version !== u.version) return { ok: false, error: "bundle" };
+  if (d.sign && !(await d.sign(staged))) return { ok: false, error: "sign" };
   return { ok: true, staged };
 }
 

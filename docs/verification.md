@@ -50,3 +50,9 @@ No measurable difference on this run: with the Mac on 6 GHz, AWDL caused no spik
 - Tag `v0.1.1` → published; the installed 0.1.0 detected 0.1.1 at launch with the correct download URL.
 - Note: releases are ad-hoc signed, so firewalls such as LuLu ask again for each new version.
 - Self-update: installed 0.1.2 detected 0.1.3, `quietlink update` downloaded it, checked SHA-256 and bundle, quit, swapped the bundle (old one to the Trash), relaunched as 0.1.3 in ~4 s and reported "up to date". AWDL stayed up; warden kept pointing at the installed helper.
+
+## Local Network privacy (2026-09-24, macOS 27)
+
+- Unsigned rebuilds lost the Local Network grant (router probes: `EHOSTUNREACH`, errno 65) even with Quietlink enabled in Privacy → Local Network.
+- Fix: helper packaged as `Quietlink Helper.app` with `NSLocalNetworkUsageDescription`; builds signed in Electrobun's postBuild hook (before compression) with a local self-signed "Quietlink Local" identity; updates re-signed with it before install.
+- Result: router probes 9/9 replies; after a fresh rebuild and reinstall still 8/8 without re-granting.

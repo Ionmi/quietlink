@@ -121,6 +121,19 @@ func runWardenTests() -> Int32 {
   check(classifyReply(rttMs: 1000, deadlineMs: 1000) == .lateAfterLoss, "reply at deadline is loss + late")
   check(classifyReply(rttMs: 1400, deadlineMs: 1000) == .lateAfterLoss, "reply read after deadline is loss + late")
 
+  // PingProber output parsing
+  var events: [[String: Any]] = []
+  emitHook = { events.append($0) }
+  let pp = PingProber(target: "192.0.2.1")
+  pp.handle("64 bytes from 192.0.2.1: icmp_seq=0 ttl=64 time=3.2 ms")
+  pp.handle("Request timeout for icmp_seq 1")
+  pp.handle("64 bytes from 192.0.2.1: icmp_seq=1 ttl=64 time=1200.5 ms")
+  pp.handle("64 bytes from 192.0.2.1: icmp_seq=2 ttl=64 time=1500.0 ms")
+  emitHook = nil
+  let kinds = events.map { "\($0["type"]!):\($0["seq"]!):\($0["outcome"] ?? "-")" }
+  check(kinds == ["probe-sent:0:-", "probe-result:0:reply", "probe-sent:1:-", "probe-result:1:lost", "probe-late:1:-",
+                  "probe-sent:2:-", "probe-result:2:lost", "probe-late:2:-"], "system ping output → probe events (\(kinds))")
+
   print(failed ? "warden tests FAILED" : "warden tests ok")
   return failed ? 1 : 0
 }

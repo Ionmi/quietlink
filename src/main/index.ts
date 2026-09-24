@@ -7,6 +7,7 @@ import { buildReport } from "../app/export";
 import { safeUninstall } from "../app/uninstall";
 import { checkForUpdate } from "../adapters/update-check";
 import { prepareUpdate, swapScript } from "../app/updater";
+import { findLocalIdentity, signApp } from "../adapters/local-identity";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { startCliServer } from "../app/cli-server";
@@ -160,6 +161,10 @@ const api: Api = {
         const plist = join(app, "Contents/Info.plist");
         const get = (k: string) => Bun.spawnSync(["/usr/bin/plutil", "-extract", k, "raw", plist]).stdout.toString().trim();
         return { id: get("CFBundleIdentifier"), version: get("CFBundleVersion") };
+      },
+      sign: async (app) => {
+        const id = findLocalIdentity();
+        return id ? signApp(app, id) : true;
       },
     });
     if (!r.ok) {

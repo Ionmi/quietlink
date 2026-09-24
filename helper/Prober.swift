@@ -17,6 +17,9 @@ final class Prober {
   private let deadlineMs: Double
   private let queue = DispatchQueue(label: "quietlink.prober")
   private var addr = sockaddr_in()
+  /// Called once if macOS's Local Network privacy refuses this socket.
+  var onLocalNetworkDenied: (() -> Void)?
+  private var deniedReported = false
 
   init(target: String, deadlineMs: Double = 1000) {
     self.target = target
@@ -89,7 +92,13 @@ final class Prober {
       pending[seq] = now
       emit(["type": "probe-sent", "target": target, "id": Int(id), "seq": Int(seq)])
     } else {
-      emit(["type": "probe-send-failed", "target": target, "error": "errno-\(errno)"])
+      let e = errno
+      if e == EHOSTUNREACH, !deniedReported, let cb = onLocalNetworkDenied {
+        deniedReported = true
+        DispatchQueue.main.async { cb() }
+        return
+      }
+      emit(["type": "probe-send-failed", "target": target, "error": "errno-\(e)"])
     }
   }
 
@@ -171,21 +180,51 @@ func checksum(_ b: [UInt8]) -> UInt16 {
 /// Probers keyed by target, driven by stdin commands.
 final class ProberSet {
   private var probers: [String: Prober] = [:]
+  private var pingers: [String: PingProber] = [:]
   private var ifaces: [String: String] = [:]
+  private var intervals: [String: Int] = [:]
+  /// Targets macOS refused to our socket; they use /sbin/ping from then on.
+  private var denied = Set<String>()
 
   func handle(_ name: String, _ cmd: [String: Any]) {
     guard let target = cmd["target"] as? String else { return }
     if name == "probe-start", let iface = cmd["iface"] as? String, let interval = cmd["intervalMs"] as? Int {
+      let ms = max(100, interval)
+      if denied.contains(target) {
+        if pingers[target] != nil, ifaces[target] == iface, intervals[target] == ms { return }
+        startPinger(target, iface, ms)
+        return
+      }
       if let p = probers[target], ifaces[target] == iface {
-        p.setInterval(max(100, interval))
+        p.setInterval(ms)
+        intervals[target] = ms
         return
       }
       probers.removeValue(forKey: target)?.stop()
       let p = Prober(target: target)
-      if p.start(iface: iface, intervalMs: max(100, interval)) { probers[target] = p; ifaces[target] = iface }
+      p.onLocalNetworkDenied = { [weak self] in
+        guard let self else { return }
+        self.denied.insert(target)
+        self.probers.removeValue(forKey: target)?.stop()
+        self.startPinger(target, self.ifaces[target] ?? iface, self.intervals[target] ?? ms)
+      }
+      if p.start(iface: iface, intervalMs: ms) { probers[target] = p; ifaces[target] = iface; intervals[target] = ms }
     } else if name == "probe-stop" {
       probers.removeValue(forKey: target)?.stop()
+      pingers.removeValue(forKey: target)?.stop()
       ifaces.removeValue(forKey: target)
+      intervals.removeValue(forKey: target)
+    }
+  }
+
+  private func startPinger(_ target: String, _ iface: String, _ ms: Int) {
+    pingers.removeValue(forKey: target)?.stop()
+    let p = PingProber(target: target)
+    if p.start(iface: iface, intervalMs: ms) {
+      pingers[target] = p; ifaces[target] = iface; intervals[target] = ms
+      emit(["type": "probe-mode", "target": target, "mode": "system-ping"])
+    } else {
+      emit(["type": "probe-send-failed", "target": target, "error": "errno-65"])
     }
   }
 }

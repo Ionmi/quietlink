@@ -7,6 +7,8 @@ const bunRuntime = { entrypoint: "src/main/index.ts", version: "1.4.2" };
 export default {
   app: { name: "Quietlink", identifier: "dev.quietlink.app", version: pkg.version },
   runtime: { exitOnLastWindowClosed: false },
+  // Privacy strings + signing happen before the stable build is compressed.
+  scripts: { postBuild: "scripts/finalize-app.ts" },
   build: {
     mainProcess: "bun",
     bun: bunRuntime,
@@ -19,7 +21,7 @@ export default {
       "dist/views/popover/assets": "views/popover/assets",
       "dist/views/settings/index.html": "views/settings/index.html",
       "dist/views/settings/assets": "views/settings/assets",
-      "build/helper/quietlink-helper": "helper/quietlink-helper",
+      "build/helper/Quietlink Helper.app": "helper/Quietlink Helper.app",
       "src/shared/presets.json": "presets.json",
       "bin/quietlink": "bin/quietlink",
     },
