@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.6 — 2026-09-24
+- Updates no longer show Electrobun's installer window: the updater unpacks the self-extracting bundle itself, so Quietlink relaunches directly. The local signature is now applied to the app that actually runs.
+
 ## 0.1.5 — 2026-09-24
 - Fix: during a fullscreen game macOS App Nap could delay lease renewals, so the warden briefly turned AirDrop back on (4 times in one real match), causing latency spikes. App Nap is now disabled for the app and helper.
 - Stalls of the app's 1-second loop are recorded and shown, to diagnose this kind of problem.

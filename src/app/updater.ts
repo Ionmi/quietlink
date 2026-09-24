@@ -1,3 +1,4 @@
+import { lstatSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Update } from "../domain/version";
 
@@ -16,7 +17,7 @@ export type Prepared = { ok: true; staged: string } | { ok: false; error: "sourc
 
 /**
  * Downloads the release zip and its .sha256 from this project's GitHub releases,
- * checks the hash, unpacks it and checks the bundle id and version. Nothing is
+ * checks the hash, unpacks it (self-extractor included) and checks the bundle id and version. Nothing is
  * replaced here; the swap happens after the app quits.
  */
 export async function prepareUpdate(u: Update, d: Deps): Promise<Prepared> {
@@ -38,7 +39,33 @@ export async function prepareUpdate(u: Update, d: Deps): Promise<Prepared> {
   await Bun.write(zipPath, zip);
   const unzip = await d.exec(["/usr/bin/ditto", "-x", "-k", zipPath, extract]);
   if (unzip.code !== 0) return { ok: false, error: "unpack" };
-  const staged = join(extract, "Quietlink.app");
+  const outer = join(extract, "Quietlink.app");
+  // Release zips hold Electrobun's self-extractor, which shows its own installer panel on
+  // first launch. Unpack the real app here so the relaunch opens Quietlink directly.
+  const metaPath = join(outer, "Contents/Resources/metadata.json");
+  const hasMeta = (() => {
+    try {
+      return !!lstatSync(metaPath);
+    } catch (e) {
+      return (e as NodeJS.ErrnoException).code !== "ENOENT";
+    }
+  })();
+  let staged = outer;
+  if (hasMeta) {
+    const hash = await Bun.file(metaPath).json().then((m) => m?.hash, () => undefined);
+    if (typeof hash !== "string" || !/^[a-z0-9]+$/.test(hash)) return { ok: false, error: "unpack" };
+    const tar = join(d.workDir, "app.tar");
+    const into = join(d.workDir, "app");
+    try {
+      await Bun.write(tar, Bun.zstdDecompressSync(await Bun.file(join(outer, `Contents/Resources/${hash}.tar.zst`)).bytes()));
+      mkdirSync(into);
+    } catch {
+      return { ok: false, error: "unpack" };
+    }
+    if ((await d.exec(["/usr/bin/tar", "-xf", tar, "-C", into])).code !== 0) return { ok: false, error: "unpack" };
+    staged = join(into, "Quietlink.app");
+  }
+  if (!lstatSync(staged, { throwIfNoEntry: false })?.isDirectory()) return { ok: false, error: "unpack" };
   const b = await d.readBundle(staged).catch(() => null);
   if (!b || b.id !== "dev.quietlink.app" || b.version !== u.version) return { ok: false, error: "bundle" };
   if (d.sign && !(await d.sign(staged))) return { ok: false, error: "sign" };

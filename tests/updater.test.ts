@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { prepareUpdate, swapScript } from "../src/app/updater";
@@ -18,7 +18,11 @@ function deps(over: { shaText?: string; id?: string; version?: string; dittoCode
         return new Response(zipBytes);
       }) as unknown as typeof fetch,
       workDir: mkdtempSync(join(tmpdir(), "upd-")),
-      exec: async (argv: string[]) => { calls.push(argv); return { code: argv[0].endsWith("ditto") ? (over.dittoCode ?? 0) : 0, out: "" }; },
+      exec: async (argv: string[]) => {
+        calls.push(argv);
+        if (argv[0].endsWith("ditto")) mkdirSync(join(argv[4], "Quietlink.app"), { recursive: true });
+        return { code: argv[0].endsWith("ditto") ? (over.dittoCode ?? 0) : 0, out: "" };
+      },
       readBundle: async () => ({ id: over.id ?? "dev.quietlink.app", version: over.version ?? "0.2.0" }),
     },
   };
@@ -61,4 +65,42 @@ test("[update] a failed local re-sign stops the update", async () => {
   const { d } = deps();
   const r = await prepareUpdate(update, { ...d, sign: async () => false });
   expect(r).toEqual({ ok: false, error: "sign" });
+});
+
+test("[update] a self-extracting bundle is unpacked so the relaunch skips Electrobun's installer", async () => {
+  const src = mkdtempSync(join(tmpdir(), "upd-src-"));
+  mkdirSync(join(src, "Quietlink.app/Contents"), { recursive: true });
+  writeFileSync(join(src, "Quietlink.app/Contents/Info.plist"), "inner");
+  Bun.spawnSync(["/usr/bin/tar", "-cf", join(src, "app.tar"), "-C", src, "Quietlink.app"]);
+  const zst = Bun.zstdCompressSync(readFileSync(join(src, "app.tar")));
+  const { d } = deps();
+  const r = await prepareUpdate(update, {
+    ...d,
+    exec: async (argv) => {
+      if (argv[0].endsWith("ditto")) {
+        const res = join(argv[4], "Quietlink.app/Contents/Resources");
+        mkdirSync(res, { recursive: true });
+        writeFileSync(join(res, "metadata.json"), JSON.stringify({ hash: "abc" }));
+        writeFileSync(join(res, "abc.tar.zst"), zst);
+        return { code: 0, out: "" };
+      }
+      return { code: Bun.spawnSync(argv).exitCode, out: "" };
+    },
+  });
+  expect(r).toEqual({ ok: true, staged: join(d.workDir, "app/Quietlink.app") });
+  expect(readFileSync(join(d.workDir, "app/Quietlink.app/Contents/Info.plist"), "utf8")).toBe("inner");
+});
+
+test("[update] a self-extractor with bad metadata is refused", async () => {
+  const { d } = deps();
+  const r = await prepareUpdate(update, {
+    ...d,
+    exec: async (argv) => {
+      const res = join(argv[4], "Quietlink.app/Contents/Resources");
+      mkdirSync(res, { recursive: true });
+      writeFileSync(join(res, "metadata.json"), JSON.stringify({ hash: "../../evil" }));
+      return { code: 0, out: "" };
+    },
+  });
+  expect(r).toEqual({ ok: false, error: "unpack" });
 });
