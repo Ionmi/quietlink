@@ -17,3 +17,15 @@ PASS kill -9 app and warden → AWDL restored — 109 ms
 PASS second launch exits; one instance — 81094
 all checks passed
 ```
+
+## Quiet test (A = baseline, B = quiet mode), 2026-09-24, 6 GHz ch 5, 0.2 s router probes
+
+| Block | Condition | Probes | Lost | Spikes > 30 ms | p95 | Max |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | A | 301 | 0 | 0 | 6 ms | 8.9 ms |
+| 2 | B | 300 | 0 | 0 | 6 ms | 6.8 ms |
+| 3 | A | 300 | 0 | 0 | 6 ms | 6.8 ms |
+| 4 | B | 300 | 0 | 0 | 6 ms | 8.8 ms |
+
+No measurable difference on this run: with the Mac on 6 GHz, AWDL caused no spikes during the test
+(the earlier 77-spike baseline was measured on 5 GHz channel 40). Repeat when spikes are observed.
