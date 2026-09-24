@@ -49,8 +49,10 @@
     void call("manual", true, minutes * 60_000);
   }
 
+  let confirmReconnect = $state(false);
   async function reconnect() {
-    if (!confirm(tr("ui.reconnectConfirm"))) return;
+    if (!confirmReconnect) { confirmReconnect = true; setTimeout(() => (confirmReconnect = false), 4000); return; }
+    confirmReconnect = false;
     reconnectState = "working";
     const r = await call<{ ok: boolean; band?: string | null; error?: string }>("reconnectWifi");
     reconnectState = r.ok
@@ -148,7 +150,7 @@
       <p class="alert soft">
         {tr("notify.band.body")}
         <button class="text" onclick={reconnect} disabled={quiet || testing || reconnectState === "working"}>
-          {reconnectState === "working" ? tr("ui.reconnecting") : tr("ui.reconnect")}
+          {reconnectState === "working" ? tr("ui.reconnecting") : confirmReconnect ? tr("ui.reconnectConfirmShort") : tr("ui.reconnect")}
         </button>
       </p>
     {/if}

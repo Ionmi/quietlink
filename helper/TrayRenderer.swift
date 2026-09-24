@@ -1,91 +1,125 @@
 import AppKit
 
-/// Renders the whole menu-bar item as one template image, so the layout is stacked
-/// (upload over download) and the width never changes with the numbers.
-/// Template images are black + alpha; macOS tints them for light/dark menu bars.
+/// The menu-bar item, owned by the helper so it is a real template image that macOS
+/// tints for light and dark menu bars. Layout: ping (in a pill while quiet mode is
+/// on) followed by upload over download. The width depends only on which fields are
+/// shown, never on the numbers.
 enum TrayRenderer {
   static let height: CGFloat = 22
   static let pingFont = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
-  static let msFont = NSFont.systemFont(ofSize: 10, weight: .medium)
-  static let rateFont = NSFont.monospacedDigitSystemFont(ofSize: 9.5, weight: .medium)
-  static let unitFont = NSFont.systemFont(ofSize: 8, weight: .medium)
+  static let msFont = NSFont.systemFont(ofSize: 9.5, weight: .semibold)
+  static let rateFont = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .semibold)
+  static let arrowFont = NSFont.systemFont(ofSize: 8, weight: .bold)
 
-  static func textWidth(_ s: String, _ f: NSFont) -> CGFloat {
-    ceil((s as NSString).size(withAttributes: [.font: f]).width)
+  static func w(_ s: String, _ f: NSFont) -> CGFloat { ceil((s as NSString).size(withAttributes: [.font: f]).width) }
+
+  static let pingSlot = w("888", pingFont) + 2 + w("ms", msFont) + 10   // pill padding included
+  static let rateSlot = w("↑", arrowFont) + 2 + w("8888", rateFont)
+
+  static func width(ping: Bool, traffic: Bool) -> CGFloat {
+    var x: CGFloat = 0
+    if ping { x += pingSlot }
+    if ping && traffic { x += 4 }
+    if traffic { x += rateSlot }
+    return max(ceil(x), 16)
   }
 
-  /// Fixed slots: ping up to 3 digits, rates up to 4 characters ("2400", "56.7").
-  static func layout(showPing: Bool, showTraffic: Bool) -> (width: CGFloat, pingX: CGFloat, pingSlot: CGFloat, ratesX: CGFloat, rateSlot: CGFloat, arrowW: CGFloat) {
-    var x: CGFloat = 18  // crescent
-    let pingSlot = textWidth("888", pingFont)
-    let rateSlot = textWidth("8888", rateFont)
-    let arrowW = textWidth("↓", rateFont)
-    var pingX: CGFloat = 0, ratesX: CGFloat = 0
-    if showPing { x += 3; pingX = x; x += pingSlot + 2 + textWidth("ms", msFont) }
-    if showTraffic { x += 6; ratesX = x; x += arrowW + 2 + rateSlot + 2 + textWidth("Mb/s", unitFont) }
-    return (ceil(x + 1), pingX, pingSlot, ratesX, rateSlot, arrowW)
+  static func text(_ s: String, _ f: NSFont, at p: NSPoint, alpha: CGFloat = 1) {
+    (s as NSString).draw(at: NSPoint(x: p.x, y: p.y + f.descender), withAttributes: [.font: f, .foregroundColor: NSColor.black.withAlphaComponent(alpha)])
   }
 
-  static func crescent(in r: NSRect, filled: Bool, mark: Bool) {
-    // Same geometry as icons/tray-*.svg (36-unit box), scaled into r.
-    let s = r.width / 36
-    let t = NSAffineTransform()
-    t.translateX(by: r.minX, yBy: r.maxY)
-    t.scaleX(by: s, yBy: -s)
-    let p = NSBezierPath()
-    p.move(to: NSPoint(x: 20, y: 5.5))
-    p.appendArc(withCenter: NSPoint(x: 20.3, y: 18), radius: 12.5, startAngle: -91.4, endAngle: 69, clockwise: true)
-    p.appendArc(withCenter: NSPoint(x: 26.2, y: 14.8), radius: 10, startAngle: 99.3, endAngle: -116.4, clockwise: false)
-    p.close()
-    p.transform(using: t as AffineTransform)
-    NSColor.black.set()
-    if filled { p.fill() } else { p.lineWidth = 2.6 * s; p.lineJoinStyle = .round; p.stroke() }
-    if mark {
-      let d = 9 * s
-      NSBezierPath(ovalIn: NSRect(x: r.minX + 23.5 * s, y: r.maxY - 31.5 * s, width: d, height: d)).fill()
+  static func image(state: String, ping: String?, up: String?, down: String?) -> NSImage {
+    let showTraffic = up != nil && down != nil
+    let size = NSSize(width: width(ping: ping != nil, traffic: showTraffic), height: height)
+    let img = NSImage(size: size, flipped: false) { _ in
+      var x: CGFloat = 0
+      if let ping {
+        // Right-aligned in its slot: spare room becomes leading space, not a gap in the middle.
+        let textW = w(ping, pingFont) + 2 + w("ms", msFont)
+        let px = x + pingSlot - (textW + 10)
+        let pill = NSRect(x: px, y: 3, width: textW + 10, height: 16)
+        let quiet = state == "quiet"
+        if quiet {
+          NSColor.black.setFill()
+          NSBezierPath(roundedRect: pill, xRadius: 5, yRadius: 5).fill()
+          NSGraphicsContext.current?.compositingOperation = .destinationOut
+        }
+        text(ping, pingFont, at: NSPoint(x: px + 5, y: 6.5))
+        text("ms", msFont, at: NSPoint(x: px + 5 + w(ping, pingFont) + 2, y: 6.5), alpha: quiet ? 1 : 0.7)
+        NSGraphicsContext.current?.compositingOperation = .sourceOver
+        if state == "warn" {
+          NSColor.black.setFill()
+          NSBezierPath(ovalIn: NSRect(x: pill.maxX - 5, y: 14, width: 5, height: 5)).fill()
+        }
+        x += pingSlot + (showTraffic ? 4 : 0)
+      } else if state != "idle" {
+        NSColor.black.setFill()
+        NSBezierPath(ovalIn: NSRect(x: 5, y: 8, width: 6, height: 6)).fill()
+      }
+      if let up, let down {
+        // Arrows sit right next to each number; both lines right-aligned.
+        let right = x + rateSlot
+        let aw = w("↑", arrowFont) + 1.5
+        text(up, rateFont, at: NSPoint(x: right - w(up, rateFont), y: 12))
+        text("↑", arrowFont, at: NSPoint(x: right - w(up, rateFont) - aw, y: 12.5), alpha: 0.6)
+        text(down, rateFont, at: NSPoint(x: right - w(down, rateFont), y: 1.5))
+        text("↓", arrowFont, at: NSPoint(x: right - w(down, rateFont) - aw, y: 2), alpha: 0.6)
+      }
+      return true
     }
+    img.isTemplate = true
+    return img
   }
 
-  static func draw(_ s: String, font: NSFont, rightAt: CGFloat, baselineY: CGFloat, alpha: CGFloat = 1) {
-    let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black.withAlphaComponent(alpha)]
-    let w = (s as NSString).size(withAttributes: attrs).width
-    (s as NSString).draw(at: NSPoint(x: rightAt - w, y: baselineY + font.descender), withAttributes: attrs)
-  }
-
-  /// Writes a @2x PNG and returns its size in points.
+  /// Offline rendering for previews and tests.
   static func render(to path: String, state: String, ping: String?, up: String?, down: String?) -> (width: CGFloat, height: CGFloat)? {
-    let showPing = ping != nil, showTraffic = up != nil && down != nil
-    let L = layout(showPing: showPing, showTraffic: showTraffic)
-    let size = NSSize(width: L.width, height: height)
-    guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2), bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
-    rep.size = size
+    let img = image(state: state, ping: ping, up: up, down: down)
+    guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(img.size.width * 2), pixelsHigh: Int(img.size.height * 2), bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+    rep.size = img.size
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-    crescent(in: NSRect(x: 1, y: 3, width: 16, height: 16), filled: state == "quiet", mark: state == "warn")
-    if let ping {
-      draw(ping, font: pingFont, rightAt: L.pingX + L.pingSlot, baselineY: 6)
-      draw("ms", font: msFont, rightAt: L.pingX + L.pingSlot + 2 + textWidth("ms", msFont), baselineY: 6, alpha: 0.75)
-    }
-    if let up, let down {
-      let numRight = L.ratesX + L.arrowW + 2 + L.rateSlot
-      draw("↑", font: rateFont, rightAt: L.ratesX + L.arrowW, baselineY: 12.5, alpha: 0.75)
-      draw(up, font: rateFont, rightAt: numRight, baselineY: 12.5)
-      draw("↓", font: rateFont, rightAt: L.ratesX + L.arrowW, baselineY: 2, alpha: 0.75)
-      draw(down, font: rateFont, rightAt: numRight, baselineY: 2)
-      draw("Mb/s", font: unitFont, rightAt: numRight + 2 + textWidth("Mb/s", unitFont), baselineY: 7.5, alpha: 0.6)
-    }
+    img.draw(in: NSRect(origin: .zero, size: img.size))
     NSGraphicsContext.restoreGraphicsState()
-    guard let png = rep.representation(using: .png, properties: [:]) else { return nil }
-    let tmp = path + ".tmp"
-    guard (try? png.write(to: URL(fileURLWithPath: tmp))) != nil, rename(tmp, path) == 0 else { return nil }
-    return (size.width, size.height)
+    guard let png = rep.representation(using: .png, properties: [:]), (try? png.write(to: URL(fileURLWithPath: path))) != nil else { return nil }
+    return (img.size.width, img.size.height)
   }
 
   static func handle(_ cmd: [String: Any]) {
-    guard let path = cmd["path"] as? String, path.hasSuffix(".png") else { return }
     let state = cmd["state"] as? String ?? "idle"
-    if let r = render(to: path, state: state, ping: cmd["ping"] as? String, up: cmd["up"] as? String, down: cmd["down"] as? String) {
-      emit(["type": "tray-image", "path": path, "width": r.width, "height": r.height])
+    let ping = cmd["ping"] as? String, up = cmd["up"] as? String, down = cmd["down"] as? String
+    if let path = cmd["path"] as? String, path.hasSuffix(".png") {
+      if let r = render(to: path, state: state, ping: ping, up: up, down: down) {
+        emit(["type": "tray-image", "path": path, "width": r.width, "height": r.height])
+      }
+      return
     }
+    StatusItem.shared.show(image(state: state, ping: ping, up: up, down: down))
+  }
+}
+
+/// NSStatusItem owned by the helper; clicks are reported to the app with the item's
+/// frame (Cocoa coordinates) and the screen layout, so the app can place its popover.
+final class StatusItem: NSObject {
+  static let shared = StatusItem()
+  private var item: NSStatusItem?
+
+  func show(_ img: NSImage) {
+    if item == nil {
+      let it = NSStatusBar.system.statusItem(withLength: img.size.width + 8)
+      it.button?.target = self
+      it.button?.action = #selector(clicked)
+      it.button?.imagePosition = .imageOnly
+      it.button?.setAccessibilityLabel("Quietlink")
+      item = it
+    }
+    if abs((item!.length) - (img.size.width + 8)) > 0.5 { item!.length = img.size.width + 8 }
+    item!.button?.image = img
+  }
+
+  @objc private func clicked() {
+    guard let b = item?.button, let win = b.window else { return }
+    let f = win.convertToScreen(b.convert(b.bounds, to: nil))
+    emit(["type": "tray-clicked", "x": f.origin.x, "y": f.origin.y, "width": f.width, "height": f.height,
+          "screens": screensSnapshot()["screens"] ?? []])
   }
 }

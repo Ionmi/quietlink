@@ -1,0 +1,32 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b1622; --side: #0f1d2b; --panel: #13263a; --raised: #1a3048; --field: #0f1f30;
+  --ink: #e6eef2; --dim: #8aa0ad; --hair: rgba(230, 238, 242, 0.09); --hair-strong: rgba(230, 238, 242, 0.2);
+  --track: rgba(230, 238, 242, 0.16); --teal: #1f9e9a; --mint: #9ff3e6; --amber: #f2a541; --danger: #f07167;
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #eef3f5; --side: #e3ebef; --panel: #ffffff; --raised: #ffffff; --field: #f6f9fa;
+    --ink: #11222f; --dim: #5d7280; --hair: rgba(17, 34, 47, 0.1); --hair-strong: rgba(17, 34, 47, 0.25);
+    --track: rgba(17, 34, 47, 0.16); --teal: #0e7c86; --mint: #0e7c86; --amber: #b86a12; --danger: #c2372c;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
+button { font: inherit; }
+.btn { border: 0; border-radius: 7px; padding: 6px 13px; background: var(--raised); color: var(--ink); cursor: pointer; border: 1px solid var(--hair); }
+.btn:hover:not(:disabled) { border-color: var(--hair-strong); }
+.btn.primary { background: var(--teal); border-color: transparent; color: #fff; }
+.btn.danger { color: var(--danger); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+.link { background: none; border: 0; padding: 0; color: var(--teal); cursor: pointer; }
+.field { font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--hair); border-radius: 7px; padding: 6px 10px; width: 200px; }
+.field[aria-invalid="true"] { border-color: var(--danger); }
+.page-title { margin: 0 0 4px; font: 600 24px/1.15 ui-rounded, "SF Pro Rounded", -apple-system, sans-serif; letter-spacing: -0.01em; }
+.page-lede { margin: 0 0 22px; color: var(--dim); max-width: 60ch; }
+.dim { color: var(--dim); }
+input[type="range"] { accent-color: var(--teal); width: 180px; }

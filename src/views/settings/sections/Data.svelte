@@ -1,45 +1,69 @@
 <script lang="ts">
   import { app, call, tr } from "../../shared/state.svelte";
+  import Group from "../ui/Group.svelte";
+  import Row from "../ui/Row.svelte";
+  import Switch from "../ui/Switch.svelte";
 
   let includeIds = $state(false);
-  let message = $state("");
+  let exported = $state("");
+  let cli = $state("");
+  let confirmClear = $state(false);
+  let cleared = $state(false);
+  const sessions = $derived(app.view!.sessions);
+
+  const fmtDate = (ts: number) => new Date(ts).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  const mins = (a: number, b: number) => Math.max(1, Math.round((b - a) / 60_000));
 
   async function exportIt() {
-    message = tr("set.working");
-    const path = await call<string>("exportDiagnostics", includeIds);
-    message = tr("set.exported", { path });
+    exported = tr("set.working");
+    exported = tr("set.exported", { path: (await call<string>("exportDiagnostics", includeIds)).replace(/^\/Users\/[^/]+/, "~") });
   }
-
-  async function cli() {
+  async function installCli() {
     const r = await call<{ ok: boolean; path?: string; error?: string }>("installCli");
-    message = r.ok ? tr("set.cliDone", { path: r.path! }) : tr("set.failed", { error: r.error ?? "?" });
+    cli = r.ok ? tr("set.cliDone", { path: r.path!.replace(/^\/Users\/[^/]+/, "~") }) : tr("set.failed", { error: r.error ?? "?" });
   }
-
-  const sessions = $derived(app.view!.sessions);
+  function clear() {
+    if (!confirmClear) { confirmClear = true; setTimeout(() => (confirmClear = false), 4000); return; }
+    void call("clearData");
+    confirmClear = false;
+    cleared = true;
+  }
 </script>
 
-<h1>{tr("set.data")}</h1>
-<p class="muted">{tr("set.retention")}</p>
+<h1 class="page-title">{tr("set.data")}</h1>
+<p class="page-lede">{tr("set.retention")}</p>
 
-<h2>{tr("ui.sessions")}</h2>
-{#if sessions.length}
-  <ul class="list">
-    {#each sessions as s (s.id)}
-      <li>
-        <span>{new Date(s.start).toLocaleString()} · {s.triggers.join(", ")}</span>
-        <span class="muted small">{tr("ui.sessionLine", { dur: Math.max(1, Math.round((s.end - s.start) / 60_000)), p95: s.p95 ?? "—", cuts: s.interruptions, loss: s.lossPct })}</span>
-      </li>
-    {/each}
-  </ul>
-{:else}
-  <p class="muted">{tr("ui.noSessions")}</p>
-{/if}
+<Group title={tr("ui.sessions")}>
+  {#each sessions as s (s.id)}
+    <Row title={s.triggers.join(", ") || tr("lease.manual")} detail={`${fmtDate(s.start)} · ${mins(s.start, s.end)} min`}>
+      <span class="stat"><b>{s.p95 ?? "—"}</b> ms p95</span>
+      <span class="stat" class:bad={s.interruptions > 0}><b>{s.interruptions}</b> {tr("s.cuts")}</span>
+    </Row>
+  {:else}
+    <Row title={tr("ui.noSessions")} detail={tr("s.sessionsHint")} />
+  {/each}
+</Group>
 
-<h2>{tr("set.export")}</h2>
-<label class="row"><input type="checkbox" bind:checked={includeIds} /> {tr("set.includeIds")}</label>
-<div class="row">
-  <button onclick={exportIt}>{tr("set.export")}</button>
-  <button onclick={cli}>{tr("set.cli")}</button>
-  <button class="danger" onclick={() => { if (confirm(tr("set.clear") + "?")) { void call("clearData"); message = tr("set.cleared"); } }}>{tr("set.clear")}</button>
-</div>
-{#if message}<p class="muted" role="status">{message}</p>{/if}
+<Group title={tr("s.share")}>
+  <Row title={tr("set.export")} detail={exported || tr("s.exportDetail")}>
+    <button class="btn" onclick={exportIt}>{tr("s.exportBtn")}</button>
+  </Row>
+  <Row title={tr("set.includeIds")} detail={tr("s.includeIdsDetail")}>
+    <Switch checked={includeIds} label={tr("set.includeIds")} onchange={(v) => (includeIds = v)} />
+  </Row>
+  <Row title={tr("s.cliTitle")} detail={cli || tr("s.cliDetail")}>
+    <button class="btn" onclick={installCli}>{tr("s.install")}</button>
+  </Row>
+</Group>
+
+<Group>
+  <Row title={tr("set.clear")} detail={cleared ? tr("set.cleared") : tr("s.clearDetail")}>
+    <button class="btn danger" onclick={clear}>{confirmClear ? tr("s.confirmClear") : tr("s.clear")}</button>
+  </Row>
+</Group>
+
+<style>
+  .stat { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .stat b { color: var(--ink); font-weight: 600; }
+  .stat.bad b { color: var(--amber); }
+</style>

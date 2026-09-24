@@ -39,7 +39,9 @@ func runSensor() -> Never {
     }
     exit(0)
   }
-  RunLoop.main.run()
+  // A real NSApplication so the helper can own the menu-bar item (no Dock icon).
+  NSApplication.shared.setActivationPolicy(.accessory)
+  NSApplication.shared.run()
   exit(0)
 }
 

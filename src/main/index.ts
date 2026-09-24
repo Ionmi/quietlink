@@ -16,7 +16,7 @@ import * as privilege from "../adapters/privilege";
 import { WARDEN_LABEL, LOGIN_LABEL, agentInstalled, installAgent, loginPlist, removeAgent, wardenPlist } from "../adapters/launch-agents";
 import { appSupport, cliSock, dbPath, ensureAppSupport, helperBinary, instanceLockPath, keyPath, settingsPath } from "../adapters/paths";
 import { configureWindows, broadcast, hidePopover, setPopoverHeight, setQuitting, showSettings, togglePopover } from "./windows";
-import { TrayController, trayState } from "./tray";
+import { trayState } from "./tray-state";
 import { trayImageSpec } from "../domain/menubar";
 import { dispatch, type Api } from "./rpc-api";
 import pkg from "../../package.json";
@@ -138,24 +138,23 @@ const api: Api = {
 };
 configureWindows((method, args) => dispatch(api, method, args));
 
-const tray = new TrayController((bounds) => {
-  const out = Bun.spawnSync([helperPath, "--screens"]).stdout.toString();
-  togglePopover(bounds, JSON.parse(out).screens);
-});
 
-// Menu-bar image: rendered by the helper, swapped between two files so macOS reloads it.
+// The menu-bar item is a native NSStatusItem owned by the helper (template image,
+// tinted by macOS). The app only sends what to show and receives clicks.
 let lastSpec = "";
-let flip = false;
 helper.on((e) => {
-  if (e.type === "tray-image") tray.showImage(e.path, e.width);
+  if (e.type === "tray-clicked") togglePopover({ x: e.x, y: e.y, width: e.width, height: e.height }, e.screens);
+});
+helper.onRestart(() => {
+  lastSpec = "";
+  renderTray(controller.view());
 });
 function renderTray(v: ReturnType<typeof controller.view>) {
   const spec = trayImageSpec(trayState(v, v.because.length > 0), v.ping.gw, v.traffic, { ping: v.settings.showPingInMenuBar, traffic: v.settings.showTrafficInMenuBar });
   const key = JSON.stringify(spec);
   if (key === lastSpec) return;
   lastSpec = key;
-  flip = !flip;
-  helper.send({ v: 1, cmd: "render-tray", path: join(appSupport, flip ? "tray-a.png" : "tray-b.png"), ...spec });
+  helper.send({ v: 1, cmd: "render-tray", ...spec });
 }
 
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -189,7 +188,6 @@ async function finish() {
   setQuitting();
   await controller.stop().catch(() => {});
   cli.stop();
-  tray.remove();
   telemetry.close();
   lock?.release();
   Utils.quit(0);

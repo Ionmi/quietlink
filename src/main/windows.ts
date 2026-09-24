@@ -1,4 +1,4 @@
-import { BrowserView, BrowserWindow } from "electrobun/main";
+import { BrowserView, BrowserWindow, Utils } from "electrobun/main";
 import { popoverFrame, type Rect, type Screen } from "./geometry";
 
 const POPOVER = { width: 368, height: 460 };
@@ -13,6 +13,7 @@ const rpcs = new Set<any>();
 let invoke: Invoke = () => { throw new Error("not configured"); };
 let quitting = false;
 let shownAt = 0;
+let hiddenAt = 0;
 
 export function configureWindows(fn: Invoke) {
   invoke = fn;
@@ -63,7 +64,10 @@ function createPopover() {
   // The status-item click can steal focus back right after show(); ignore blurs
   // in that short window so the popover doesn't close itself on open.
   win.on("blur", () => {
-    if (Date.now() - shownAt > 400) win.hide();
+    if (Date.now() - shownAt > 400) {
+      win.hide();
+      hiddenAt = Date.now();
+    }
   });
   win.on("will-close", (event: any) => {
     if (!quitting) {
@@ -80,6 +84,8 @@ function createPopover() {
 }
 
 export function togglePopover(tray: Rect, screens: Screen[]) {
+  // Clicking the item while the popover is open first blurs (hides) it; don't reopen.
+  if (Date.now() - hiddenAt < 300) return;
   const win = createPopover();
   const f = popoverFrame(tray, screens, { width: POPOVER.width, height: popoverHeight });
   lastFrame = { x: f.x, y: f.y };
@@ -120,6 +126,7 @@ export function showSettings() {
       if (!quitting) {
         event.response = { allow: false };
         settings?.hide();
+        Utils.setDockIconVisible(false); // back to a menu-bar-only app
       }
     });
     settings.on("close", () => {
@@ -127,6 +134,7 @@ export function showSettings() {
       settings = null;
     });
   }
+  Utils.setDockIconVisible(true); // visible only while Settings is open
   settings.show();
   settings.activate();
 }
