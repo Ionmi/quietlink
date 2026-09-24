@@ -28,7 +28,7 @@ test("recordBand dedupes, ignores unknowns and does not mutate", () => {
 
 test("gateway id is stable, case-insensitive and does not contain the mac", () => {
   const a = gatewayId("0a:1b:2c:3d:4e:5f", key)!;
-  expect(a).toBe(gatewayId("0A:1B:2C:3D:4E:5F", key));
+  expect(gatewayId("0A:1B:2C:3D:4E:5F", key)).toBe(a);
   expect(a).not.toContain("0a1b");
   expect(a).toHaveLength(64);
   expect(gatewayId(null, key)).toBeNull();
