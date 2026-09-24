@@ -20,10 +20,27 @@ export function startCliServer(path: string, h: CliHandlers) {
   if ((dir.mode & 0o777) !== 0o700 || dir.uid !== process.getuid!()) throw new Error(`${dirname(path)} must be 0700 and owned by the current user`);
   if (existsSync(path)) unlinkSync(path);
   const reply = (o: object) => JSON.stringify(o) + "\n";
+  // Bun's socket.write may accept only part of a large payload; the rest is queued
+  // per socket and flushed on "drain".
+  const pending = new Map<unknown, Uint8Array>();
+  const flush = (s: { write(b: Uint8Array): number }) => {
+    const rest = pending.get(s);
+    if (!rest) return;
+    const n = s.write(rest);
+    if (n >= rest.length) pending.delete(s);
+    else pending.set(s, rest.subarray(Math.max(0, n)));
+  };
   const server = Bun.listen({
     unix: path,
     socket: {
-      data(s, d) {
+      drain(s) {
+        flush(s);
+      },
+      close(s) {
+        pending.delete(s);
+      },
+      data(raw, d) {
+        const s = { write: (text: string) => { const prev = pending.get(raw); const bytes = new TextEncoder().encode(text); pending.set(raw, prev ? new Uint8Array([...prev, ...bytes]) : bytes); flush(raw); } };
         let msg: { cmd?: string; minutes?: number };
         try { msg = JSON.parse(d.toString()); } catch { s.write(reply({ ok: false, error: "bad json" })); return; }
         try {

@@ -37,3 +37,13 @@ test("cli server refuses a directory with wrong mode", () => {
   chmodSync(dir, 0o755);
   expect(() => startCliServer(join(dir, "cli.sock"), {} as any)).toThrow("0700");
 });
+
+test("large status replies are delivered completely", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "cli-"));
+  chmodSync(dir, 0o700);
+  const big = { phase: "inactive", blob: "x".repeat(2_000_000) };
+  const srv = startCliServer(join(dir, "cli.sock"), { status: () => big, on() {}, off() {}, pause() {}, resume() {}, test() {} });
+  const r = (await ask(join(dir, "cli.sock"), { cmd: "status" })) as any;
+  expect(r.status.blob.length).toBe(2_000_000);
+  srv.stop();
+});
