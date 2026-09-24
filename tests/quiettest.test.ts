@@ -121,3 +121,9 @@ test("inputs after finishing are ignored and verdict needs both conditions", () 
   expect(r.s.phase).toBe("cancelled");
   expect(verdict(r.s)).toBeNull();
 });
+
+test("[final] arming times out", () => {
+  const r = step(initialQT, start, { kind: "tick", now: 16_000, wifi: W });
+  expect(r.s).toMatchObject({ phase: "invalid", reason: "timeout" });
+  expect(r.e).toContainEqual({ kind: "test-release" });
+});

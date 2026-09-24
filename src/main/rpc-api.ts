@@ -12,7 +12,7 @@ export type Api = {
   resume(): Promise<void>;
   startQuietTest(): void;
   cancelQuietTest(): void;
-  reconnectWifi(): Promise<{ ok: boolean; error?: string }>;
+  reconnectWifi(): Promise<{ ok: boolean; band?: string | null; error?: string }>;
   getSettings(): Settings;
   updateSettings(p: Partial<Settings>): Promise<Settings>;
   installPrivilege(): Promise<{ ok: boolean; error?: string }>;

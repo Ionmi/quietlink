@@ -63,3 +63,12 @@ test("unverified presets load disabled", () => {
 test("every call preset except Zoom meeting requires input activity", () => {
   for (const r of loadPresets(presets).filter((r) => r.kind === "call" && r.id !== "zoom-meeting")) expect(r.requireInput).toBe(true);
 });
+
+test("[final] 'this executable only' rule from a picked process matches that process", async () => {
+  const { ruleFromApp } = await import("../src/domain/triggers");
+  const path = "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)";
+  const rule = ruleFromApp({ name: "Google Chrome", path, bundle: "/Applications/Google Chrome.app" }, "exe", "id1");
+  expect(matchRules([rule], [P(1, path)], null)).toHaveLength(1);
+  const whole = ruleFromApp({ name: "Google Chrome", path, bundle: "/Applications/Google Chrome.app" }, "app", "id2");
+  expect(matchRules([whole], [P(2, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")], null)).toHaveLength(1);
+});

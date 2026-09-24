@@ -50,6 +50,8 @@ export type AppView = {
   interruptionsLastHour: number;
   /** Every router and external probe lost while Wi-Fi is up: likely a firewall (LuLu, Little Snitch) blocking the helper. */
   probesBlocked: boolean;
+  /** The warden still owes a restore (e.g. a failed `up` it keeps retrying). */
+  restore: { pending: boolean; error: string | null };
   /** Bytes/s the Wi-Fi interface is moving right now (not link capacity). */
   traffic: Traffic | null;
   advice: Advice;
@@ -69,7 +71,10 @@ type Deps = {
   settings: SettingsStore;
   telemetry: TelemetryStore;
   notify: (title: string, body: string) => void;
+  /** Wall clock (ms): telemetry, events, probe timestamps. */
   now?: () => number;
+  /** Monotonic clock (ms): every deadline (leases, grace, freshness, rate limits). */
+  mono?: () => number;
   gatewayKey: Uint8Array;
   wardenPid: () => Promise<number | null>;
   macosMajor: number;
@@ -116,10 +121,13 @@ export class Controller {
   private timer: ReturnType<typeof setInterval> | null = null;
   private wardenHealthy = true;
   private readonly now: () => number;
+  private readonly mono: () => number;
+  private pendingCollections: { run: number; block: number; cond: "A" | "B"; from: number; to: number; at: number }[] = [];
 
   constructor(private d: Deps) {
     this.now = d.now ?? (() => Date.now());
-    this.lastProcsAt = this.lastInputAt = this.now();
+    this.mono = d.mono ?? d.now ?? (() => performance.now());
+    this.lastProcsAt = this.lastInputAt = this.mono();
     d.helper.on((e) => { if (!this.stopped) this.onHelperEvent(e); });
     d.helper.onRestart(() => {
       this.ledger.onHelperRestart(this.now());
@@ -171,7 +179,7 @@ export class Controller {
   // ---------- leases ----------
 
   private reconcileLeases() {
-    const now = this.now();
+    const now = this.mono();
     const desired = new Map<string, Lease>();
     if (!this.s.paused) {
       for (const m of matchRules(this.s.rules, this.procs, this.inputActive))
@@ -187,8 +195,8 @@ export class Controller {
   }
 
   private leasesChanged(graceMs = this.s.graceMs) {
-    const count = this.leases.active(this.now()).length;
-    if (count !== this.mode.leases) this.input({ kind: "leases-changed", activeCount: count, now: this.now() }, graceMs);
+    const count = this.leases.active(this.mono()).length;
+    if (count !== this.mode.leases) this.input({ kind: "leases-changed", activeCount: count, now: this.mono() }, graceMs);
   }
 
   // ---------- mode ----------
@@ -226,12 +234,15 @@ export class Controller {
                 if (accepted && qtRun !== null && this.qt.run === qtRun && this.leases.has("test")) this.qtInput({ kind: "hold-ack", run: qtRun, now: this.now() });
               } else {
                 const err = r.ok ? "no-token" : r.error;
-                this.input({ kind: "hold-failed", generation: e.generation, error: err, now: this.now() });
-                if (err === "no-privilege" && this.policy.allow("privilege", this.now())) this.d.notify(this.tr("notify.privilege.title"), this.tr("notify.privilege.body"));
+                this.input({ kind: "hold-failed", generation: e.generation, error: err, now: this.mono() });
+                if (err === "no-privilege" && this.policy.allow("privilege", this.mono())) this.d.notify(this.tr("notify.privilege.title"), this.tr("notify.privilege.body"));
                 if (this.qtRunning()) this.qtInput({ kind: "transition-failed", reason: err });
               }
             },
-            (err) => this.input({ kind: "hold-failed", generation: e.generation, error: String(err?.message ?? err), now: this.now() }),
+            (err) => {
+              this.input({ kind: "hold-failed", generation: e.generation, error: String(err?.message ?? err), now: this.mono() });
+              if (qtRun !== null && this.qt.run === qtRun && this.qtRunning()) this.qtInput({ kind: "transition-failed", reason: String(err?.message ?? err) });
+            },
           ),
         );
         break;
@@ -293,12 +304,12 @@ export class Controller {
     const reenables = ((this.d.warden.lastStatus as any)?.reenables ?? s.reenables0) - s.reenables0;
     const sum = summarize({ start: s.start, end: this.now(), triggers: [...s.triggers], hist: s.hist, max: s.max, spikes: s.spikes, interruptions: s.interruptions, sent: s.sent, lost: s.lost, awdlReenables: Math.max(0, reenables), notes: s.notes });
     this.d.telemetry.addSession(sum, s.hist.toJSON());
-    if (s.interruptions > 0 && this.policy.allow("session", this.now()))
+    if (s.interruptions > 0 && this.policy.allow("session", this.mono()))
       this.d.notify(this.tr("notify.session.title"), this.tr("notify.session.body", { count: s.interruptions, name: sum.triggers.join(", ") }));
   }
 
   private labels() {
-    return this.leases.active(this.now()).map((l) => l.label);
+    return this.leases.active(this.mono()).map((l) => l.label);
   }
 
   // ---------- public actions ----------
@@ -307,8 +318,8 @@ export class Controller {
     this.leases.remove("manual");
     this.leases.remove("timed");
     if (on) {
-      if (durationMs) this.leases.add({ id: "timed", source: "timed", label: this.tr("lease.timed", { min: Math.round(durationMs / 60_000) }), since: this.now(), expiresAt: this.now() + durationMs, sensorBound: false });
-      else this.leases.add({ id: "manual", source: "manual", label: this.tr("lease.manual"), since: this.now(), sensorBound: false });
+      if (durationMs) this.leases.add({ id: "timed", source: "timed", label: this.tr("lease.timed", { min: Math.round(durationMs / 60_000) }), since: this.mono(), expiresAt: this.mono() + durationMs, sensorBound: false });
+      else this.leases.add({ id: "manual", source: "manual", label: this.tr("lease.manual"), since: this.mono(), sensorBound: false });
       if (this.qtRunning()) this.qtInput({ kind: "trigger-started" });
     }
     this.leasesChanged();
@@ -323,7 +334,7 @@ export class Controller {
   }
 
   airdropBreak(ms = 120_000) {
-    this.input({ kind: "airdrop-break", now: this.now(), ms });
+    this.input({ kind: "airdrop-break", now: this.mono(), ms });
   }
 
   async pause() {
@@ -345,12 +356,21 @@ export class Controller {
     return next;
   }
 
-  async reconnectWifi(): Promise<{ ok: boolean; error?: string }> {
+  /** Succeeds only once the warden has turned Wi-Fi back on and the Mac is associated again. */
+  async reconnectWifi(opts: { pollMs?: number; timeoutMs?: number } = {}): Promise<{ ok: boolean; band?: string | null; error?: string }> {
     if (this.quietPhase() || this.qtRunning()) return { ok: false, error: "quiet-active" };
     const iface = this.wifi?.iface;
     if (!iface) return { ok: false, error: "no-wifi" };
     const r = await this.track(this.d.warden.request({ op: "reconnect-wifi", iface }).catch((e) => ({ ok: false, error: String(e?.message ?? e) }) as any));
-    return r.ok ? { ok: true } : { ok: false, error: r.error };
+    if (!r.ok) return { ok: false, error: r.error };
+    // A real-time wait budget for the user-visible operation (not a domain deadline).
+    const end = performance.now() + (opts.timeoutMs ?? 20_000);
+    while (performance.now() < end) {
+      await Bun.sleep(opts.pollMs ?? 500);
+      const st = await this.d.warden.request({ op: "status" }).then((x) => (x.ok && x.status) || this.d.warden.lastStatus, () => this.d.warden.lastStatus);
+      if (st && !st.wifiPending && this.wifi?.powerOn !== false && this.wifi?.band) return { ok: true, band: this.wifi.band };
+    }
+    return { ok: false, error: "timeout" };
   }
 
   /** Running app bundles, for the "add app" picker. */
@@ -375,7 +395,7 @@ export class Controller {
   }
 
   startQuietTest() {
-    this.qtInput({ kind: "start", now: this.now(), activeLeases: this.leases.active(this.now()).length, inGrace: this.mode.phase === "grace", wifi: this.fingerprint() });
+    this.qtInput({ kind: "start", now: this.now(), activeLeases: this.leases.active(this.mono()).length, inGrace: this.mode.phase === "grace", wifi: this.fingerprint() });
   }
 
   cancelQuietTest() {
@@ -405,30 +425,41 @@ export class Controller {
         this.resendProbes();
         break;
       case "test-hold":
-        this.leases.add({ id: "test", source: "test", label: this.tr("lease.test"), since: this.now(), sensorBound: false });
+        this.leases.add({ id: "test", source: "test", label: this.tr("lease.test"), since: this.mono(), sensorBound: false });
         this.leasesChanged();
         break;
       case "test-release":
         this.leases.remove("test");
         this.leasesChanged(0); // no grace between test blocks
-        if (this.mode.phase === "grace") this.input({ kind: "tick", now: this.now() }, 0);
+        if (this.mode.phase === "grace") this.input({ kind: "tick", now: this.mono() }, 0);
         break;
       case "hand-over-release":
         this.leases.remove("test");
         this.leasesChanged();
         break;
-      case "collect-block": {
-        const gw = this.router.ipv4;
-        const r = gw ? this.ledger.range(gw, e.from, e.to) : { sent: 0, lost: 0, replies: [] };
-        const h = new Histogram();
-        r.replies.forEach((x) => h.add(x));
-        this.qtInput({
-          kind: "block-stats", run: e.run, block: e.block,
-          stats: { cond: e.cond, sent: r.sent, lost: r.lost, spikes: r.replies.filter((x) => x > QT_SPIKE_MS).length, p95: percentile(h, 0.95), max: r.replies.length ? Math.max(...r.replies) : null },
-        });
+      case "collect-block":
+        // Probes sent near the boundary may still be awaiting their deadline;
+        // statistics are taken once they have settled (or after a bounded wait).
+        this.pendingCollections.push({ run: e.run, block: e.block, cond: e.cond, from: e.from, to: e.to, at: this.mono() });
+        this.flushCollections();
         break;
-      }
     }
+  }
+
+  private flushCollections() {
+    const gw = this.router.ipv4;
+    const keep: typeof this.pendingCollections = [];
+    for (const c of this.pendingCollections) {
+      if (gw && this.ledger.pendingIn(gw, c.from, c.to) && this.mono() - c.at < 3000) { keep.push(c); continue; }
+      const r = gw ? this.ledger.range(gw, c.from, c.to) : { sent: 0, lost: 0, replies: [] };
+      const h = new Histogram();
+      r.replies.forEach((x) => h.add(x));
+      this.qtInput({
+        kind: "block-stats", run: c.run, block: c.block,
+        stats: { cond: c.cond, sent: r.sent, lost: r.lost, spikes: r.replies.filter((x) => x > QT_SPIKE_MS).length, p95: percentile(h, 0.95), max: r.replies.length ? Math.max(...r.replies) : null },
+      });
+    }
+    this.pendingCollections = keep;
   }
 
   // ---------- probes ----------
@@ -468,7 +499,7 @@ export class Controller {
   private onHelperEvent(e: HelperEvent) {
     switch (e.type) {
       case "procs":
-        this.lastProcsAt = this.now();
+        this.lastProcsAt = this.mono();
         this.procs = e.procs;
         this.reconcileLeases();
         return;
@@ -481,7 +512,7 @@ export class Controller {
         this.reconcileLeases();
         return;
       case "input-active":
-        this.lastInputAt = this.now();
+        this.lastInputAt = this.mono();
         this.inputActive = e.active;
         this.reconcileLeases();
         return;
@@ -513,7 +544,7 @@ export class Controller {
           // Pre-sleep snapshots are stale: leases are rebuilt only from fresh sensor data.
           this.procs = [];
           this.inputActive = null;
-          this.input({ kind: "wake", now: this.now() });
+          this.input({ kind: "wake", now: this.mono() });
         }
         return;
       case "net-change":
@@ -526,7 +557,10 @@ export class Controller {
       case "probe-late":
       case "probe-send-failed":
         this.ledger.onEvent(e);
-        if (e.type === "probe-result") this.accumulate(e);
+        if (e.type === "probe-result") {
+          this.accumulate(e);
+          if (this.pendingCollections.length) this.flushCollections();
+        }
         if (e.type === "probe-late") this.bucket(e.target).late++;
         return;
     }
@@ -559,15 +593,17 @@ export class Controller {
   async tick() {
     if (this.stopped) return;
     const now = this.now();
+    const mono = this.mono();
     this.d.helper.checkHealth();
     // Sensor freshness is tracked per sensor: probe traffic never keeps triggers alive.
     let stale = false;
-    if (now - this.lastProcsAt > 30_000 && this.procs.length) { this.procs = []; stale = true; }
-    if (now - this.lastInputAt > 30_000 && this.inputActive !== null) { this.inputActive = null; stale = true; }
+    if (mono - this.lastProcsAt > 30_000 && this.procs.length) { this.procs = []; stale = true; }
+    if (mono - this.lastInputAt > 30_000 && this.inputActive !== null) { this.inputActive = null; stale = true; }
     if (stale) this.reconcileLeases();
     this.leasesChanged();
     this.checkInterruptions();
-    this.input({ kind: "tick", now });
+    this.input({ kind: "tick", now: mono });
+    this.flushCollections();
 
     if (this.qtRunning()) {
       const awdlUp = this.d.warden.lastStatus?.awdlUp;
@@ -580,7 +616,7 @@ export class Controller {
       const restored = this.d.warden.lastStatus?.restoredByWarden ?? 0;
       if (restored > this.lastRestored) {
         this.events.unshift({ ts: this.now(), kind: "restored", text: this.tr("notify.restored.body") });
-        if (this.policy.allow("restored", this.now())) this.d.notify(this.tr("notify.restored.title"), this.tr("notify.restored.body"));
+        if (this.policy.allow("restored", this.mono())) this.d.notify(this.tr("notify.restored.title"), this.tr("notify.restored.body"));
       }
       this.lastRestored = restored;
     }, () => { this.wardenHealthy = false; });
@@ -617,7 +653,7 @@ export class Controller {
       if (this.session && it.start >= this.session.start) {
         this.session.interruptions++;
         if (noteText) this.session.notes.push(noteText);
-        if (this.policy.allow("cut", this.now()))
+        if (this.policy.allow("cut", this.mono()))
           this.d.notify(this.tr("notify.cut.title"), this.tr("notify.cut.body", { ms: Math.round(durationMs), name: [...this.session.triggers].join(", ") }));
       }
     }
@@ -634,7 +670,7 @@ export class Controller {
 
   private checkAdvice() {
     const a = this.advice();
-    if (a.kind === "previously-6" && this.lastAdviceKind !== a.kind && this.policy.allow("band", this.now()))
+    if (a.kind === "previously-6" && this.lastAdviceKind !== a.kind && this.policy.allow("band", this.mono()))
       this.d.notify(this.tr("notify.band.title", { band: a.current }), this.tr("notify.band.body"));
     this.lastAdviceKind = a.kind;
   }
@@ -663,10 +699,11 @@ export class Controller {
     const now = this.now();
     const gw = this.router.ipv4;
     const w = gw ? this.ledger.window(gw, now) : null;
+    // Live reading = the most recent settled probe, and only if it answered recently.
     const lastRtt = (target: string | null) => {
       if (!target) return null;
-      const r = this.ledger.window(target, now).replies;
-      return r.length ? r[r.length - 1] : null;
+      const last = this.ledger.series(target, now - 60_000, Number.MAX_SAFE_INTEGER).at(-1);
+      return last && last.rtt !== null && now - last.t <= 6000 ? last.rtt : null;
     };
     const status = this.d.warden.lastStatus;
     const since = now - HOUR;
@@ -689,6 +726,10 @@ export class Controller {
       provisional: w?.provisional ?? false,
       interruptionsLastHour: this.events.filter((e) => e.kind === "interruption" && e.ts >= since).length,
       probesBlocked: this.probesBlocked(now),
+      restore: {
+        pending: !!status && !status.holding && (status.tookDown || !!status.wifiPending),
+        error: status && !status.holding && (status.tookDown || status.wifiPending) ? status.lastError : null,
+      },
       traffic: this.wifi ? this.traffic : null,
       advice: this.advice(),
       sparkline: spark,

@@ -32,7 +32,7 @@
       case "grace": return { word: tr("ui.quiet"), note: tr("ui.grace") };
       case "active": return { word: tr("ui.quiet"), note: v.because.join(", ") };
       case "restoring": return { word: tr("ui.off"), note: tr("ui.restoring") };
-      default: return { word: tr("ui.off"), note: v.paused ? tr("ui.paused") : tr("ui.offNote") };
+      default: return { word: tr("ui.off"), note: v.restore.pending ? tr("ui.restorePending") : v.paused ? tr("ui.paused") : tr("ui.offNote") };
     }
   });
 
@@ -52,8 +52,10 @@
   async function reconnect() {
     if (!confirm(tr("ui.reconnectConfirm"))) return;
     reconnectState = "working";
-    const r = await call<{ ok: boolean; error?: string }>("reconnectWifi");
-    reconnectState = r.ok ? "done" : tr("set.failed", { error: r.error ?? "?" });
+    const r = await call<{ ok: boolean; band?: string | null; error?: string }>("reconnectWifi");
+    reconnectState = r.ok
+      ? tr("ui.reconnectedOn", { band: r.band ?? "—" })
+      : r.error === "timeout" ? tr("ui.reconnectTimeout") : tr("set.failed", { error: r.error ?? "?" });
   }
 
   const testLine = $derived.by(() => {
@@ -107,6 +109,9 @@
       </div>
     {/if}
 
+    {#if v.restore.pending}
+      <p class="alert">{tr("ui.restorePending")}{#if v.restore.error} ({v.restore.error}){/if} <button class="text" onclick={() => call("emergency")}>{tr("restore.airdrop")}</button></p>
+    {/if}
     {#if !v.privilege && !v.recovering}
       <p class="alert">{tr("ui.privilegeMissing")} <button class="text" onclick={() => call("openSettings")}>{tr("ui.installPrivilege")}</button></p>
     {:else if !v.wardenHealthy}
@@ -147,7 +152,7 @@
         </button>
       </p>
     {/if}
-    {#if reconnectState && reconnectState !== "working"}<p class="muted">{reconnectState === "done" ? tr("ui.reconnectDone") : reconnectState}</p>{/if}
+    {#if reconnectState && reconnectState !== "working"}<p class="muted">{reconnectState}</p>{/if}
 
     <section class="events">
       {#if v.lastEvents.length}

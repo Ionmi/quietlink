@@ -56,6 +56,11 @@ final class Prober {
     return true
   }
 
+  /// Changes the send interval without closing the socket, so probes in flight still settle.
+  func setInterval(_ intervalMs: Int) {
+    queue.async { self.sendTimer?.schedule(deadline: .now() + .milliseconds(intervalMs), repeating: .milliseconds(intervalMs), leeway: .milliseconds(5)) }
+  }
+
   func stopSending() {
     queue.sync { sendTimer?.cancel() }
   }
@@ -120,7 +125,15 @@ final class Prober {
       let rseq = UInt16(buf[ihl + 6]) << 8 | UInt16(buf[ihl + 7])
       guard rid == id else { continue }
       if let t = pending.removeValue(forKey: rseq) {
-        emit(["type": "probe-result", "target": target, "id": Int(id), "seq": Int(rseq), "outcome": "reply", "rttMs": ((now - t) * 1000).rounded() / 1000])
+        let rtt = ((now - t) * 1000).rounded() / 1000
+        switch classifyReply(rttMs: now - t, deadlineMs: deadlineMs) {
+        case .reply:
+          emit(["type": "probe-result", "target": target, "id": Int(id), "seq": Int(rseq), "outcome": "reply", "rttMs": rtt])
+        case .lateAfterLoss:
+          // The deadline passed before this reply was read: loss is final, the reply is a late observation.
+          emit(["type": "probe-result", "target": target, "id": Int(id), "seq": Int(rseq), "outcome": "lost"])
+          emit(["type": "probe-late", "target": target, "id": Int(id), "seq": Int(rseq), "rttMs": rtt])
+        }
       } else if let t = lost.removeValue(forKey: rseq) {
         emit(["type": "probe-late", "target": target, "id": Int(id), "seq": Int(rseq), "rttMs": ((now - t) * 1000).rounded() / 1000])
       }
@@ -139,6 +152,13 @@ final class Prober {
   }
 }
 
+enum ReplyClass: Equatable { case reply, lateAfterLoss }
+
+/// A reply read at or after the deadline counts as a loss plus a late observation.
+func classifyReply(rttMs: Double, deadlineMs: Double) -> ReplyClass {
+  rttMs < deadlineMs ? .reply : .lateAfterLoss
+}
+
 func checksum(_ b: [UInt8]) -> UInt16 {
   var sum: UInt32 = 0
   var i = 0
@@ -151,15 +171,21 @@ func checksum(_ b: [UInt8]) -> UInt16 {
 /// Probers keyed by target, driven by stdin commands.
 final class ProberSet {
   private var probers: [String: Prober] = [:]
+  private var ifaces: [String: String] = [:]
 
   func handle(_ name: String, _ cmd: [String: Any]) {
     guard let target = cmd["target"] as? String else { return }
     if name == "probe-start", let iface = cmd["iface"] as? String, let interval = cmd["intervalMs"] as? Int {
+      if let p = probers[target], ifaces[target] == iface {
+        p.setInterval(max(100, interval))
+        return
+      }
       probers.removeValue(forKey: target)?.stop()
       let p = Prober(target: target)
-      if p.start(iface: iface, intervalMs: max(100, interval)) { probers[target] = p }
+      if p.start(iface: iface, intervalMs: max(100, interval)) { probers[target] = p; ifaces[target] = iface }
     } else if name == "probe-stop" {
       probers.removeValue(forKey: target)?.stop()
+      ifaces.removeValue(forKey: target)
     }
   }
 }

@@ -36,6 +36,18 @@ export function matchRules(rules: TriggerRule[], procs: ProcInfo[], inputActive:
   return out;
 }
 
+/** Rule for an app picked from the running-process list. */
+export function ruleFromApp(app: { name: string; path: string; bundle: string }, scope: "exe" | "app", id: string): TriggerRule {
+  return {
+    id: `custom:${id}`,
+    label: app.name,
+    kind: "game",
+    match: scope === "app" ? { bundlePrefix: app.bundle } : { executable: app.path },
+    enabled: true,
+    verified: true,
+  };
+}
+
 export function loadPresets(json: unknown): TriggerRule[] {
   const j = json as { version?: number; rules?: TriggerRule[] };
   if (j?.version !== 1 || !Array.isArray(j.rules)) throw new Error(`unsupported presets version ${j?.version}`);

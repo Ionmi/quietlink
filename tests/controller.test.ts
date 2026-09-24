@@ -57,7 +57,7 @@ function setup(opts: { settings?: object } = {}) {
   let now = 1_000_000;
   const agents: string[] = [];
   const ctl = new Controller({
-    helper, warden, settings, telemetry, now: () => now, notify: (t, b) => notes.push(`${t}: ${b}`),
+    helper, warden, settings, telemetry, now: () => now, mono: () => now, notify: (t, b) => notes.push(`${t}: ${b}`),
     gatewayKey: new Uint8Array(32), wardenPid: async () => 1, macosMajor: 27,
     installLoginAgent: async (on) => { agents.push(on ? "install" : "remove"); },
   });
@@ -318,4 +318,88 @@ test("traffic events become per-second rates in the view", async () => {
   helper.emit({ type: "traffic", iface: "en0", rxBytes: 1_000, txBytes: 100, ts: 0 });
   helper.emit({ type: "traffic", iface: "en0", rxBytes: 2_001_000, txBytes: 50_100, ts: 1000 });
   expect(ctl.view().traffic).toEqual({ down: 2_000_000, up: 50_000 });
+});
+
+// ---- final review fixes ----
+
+test("[final] restore pending after a failed release is visible, not 'normal'", async () => {
+  const { ctl, warden, advance } = setup();
+  warden.status = { ...warden.status, holding: false, tookDown: true, awdlUp: false, lastError: "awdl up failed; retrying" };
+  await advance(1000);
+  expect(ctl.view().restore).toEqual({ pending: true, error: "awdl up failed; retrying" });
+  warden.status = { ...warden.status, tookDown: false, awdlUp: true, lastError: null };
+  await advance(1000);
+  expect(ctl.view().restore).toEqual({ pending: false, error: null });
+});
+
+test("[final] deadlines use the monotonic clock: wall clock rollback does not keep leases alive", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ctl-"));
+  const helper = new FakeHelper();
+  const warden = new FakeWarden();
+  const settings = new SettingsStore(join(dir, "s.json"));
+  settings.update({ rules: settings.get().rules.map((r) => (r.id === "lol" ? { ...r, enabled: true } : r)) });
+  let wall = 10_000_000;
+  let mono = 0;
+  const ctl = new Controller({ helper, warden, settings, telemetry: new TelemetryStore(join(dir, "t.sqlite")), now: () => wall, mono: () => mono, notify: () => {}, gatewayKey: new Uint8Array(32), wardenPid: async () => 1, macosMajor: 27 });
+  helper.emit(lolProc());
+  await ctl.idle();
+  wall -= 3_600_000;
+  for (let i = 0; i < 42; i++) { mono += 1000; wall += 1000; await ctl.tick(); await ctl.idle(); }
+  expect(ctl.view().because).toEqual([]);
+});
+
+test("[final] quiet test block stats include probes still awaiting their deadline at the boundary", async () => {
+  const { ctl, helper, advance } = setup();
+  ctl.startQuietTest();
+  await advance(1000);
+  const start = ctl.view().test.blockStart!;
+  expect(start).not.toBeNull();
+  helper.emit({ type: "probe-sent", target: "192.168.1.1", id: 5, seq: 1, ts: start + 59_900 });
+  for (let i = 0; i < 60; i++) await advance(1000);
+  helper.emit({ type: "probe-result", target: "192.168.1.1", id: 5, seq: 1, ts: start + 60_900, outcome: "lost" });
+  await advance(1500);
+  await Bun.sleep(30);
+  expect(ctl.view().test.results[0]?.lost).toBe(1);
+});
+
+test("[final] a rejected hold during a quiet test invalidates it", async () => {
+  const { ctl, warden, advance } = setup();
+  ctl.startQuietTest();
+  for (let i = 0; i < 30; i++) await advance(1000);
+  expect(ctl.view().test.phase).toBe("A");
+  const orig = warden.request.bind(warden);
+  warden.request = async (req: any) => { if (req.op === "hold") throw new Error("timeout"); return orig(req); };
+  for (let i = 0; i < 35; i++) await advance(1000);
+  expect(ctl.view().test.phase).toBe("invalid");
+});
+
+test("[final] reconnect succeeds only after Wi-Fi is back and associated", async () => {
+  const { ctl, helper, warden } = setup();
+  warden.status = { ...warden.status, wifiPending: true };
+  const p = ctl.reconnectWifi({ pollMs: 5, timeoutMs: 200 });
+  await Bun.sleep(20);
+  helper.emit({ type: "wifi", iface: "en0", band: null, channel: null, widthMHz: null, rssi: null, noise: null, phyRateMbps: null, powerOn: false });
+  warden.status = { ...warden.status, wifiPending: false };
+  warden.lastStatus = warden.status;
+  await Bun.sleep(20);
+  helper.emit({ type: "wifi", iface: "en0", band: "6", channel: 5, widthMHz: 160, rssi: -40, noise: -92, phyRateMbps: 2401, powerOn: true });
+  expect(await p).toEqual({ ok: true, band: "6" });
+  warden.status = { ...warden.status, wifiPending: true };
+  warden.lastStatus = warden.status;
+  expect(await ctl.reconnectWifi({ pollMs: 5, timeoutMs: 50 })).toEqual({ ok: false, error: "timeout" });
+});
+
+test("[final] live ping is unavailable when the latest probe was lost or the reply is stale", async () => {
+  const { ctl, helper, advance, now } = setup();
+  helper.emit({ type: "probe-sent", target: "192.168.1.1", id: 4, seq: 1, ts: now() });
+  helper.emit({ type: "probe-result", target: "192.168.1.1", id: 4, seq: 1, ts: now() + 3, outcome: "reply", rttMs: 3 });
+  expect(ctl.view().ping.gw).toBe(3);
+  helper.emit({ type: "probe-sent", target: "192.168.1.1", id: 4, seq: 2, ts: now() + 500 });
+  helper.emit({ type: "probe-result", target: "192.168.1.1", id: 4, seq: 2, ts: now() + 1500, outcome: "lost" });
+  expect(ctl.view().ping.gw).toBeNull();
+  helper.emit({ type: "probe-sent", target: "192.168.1.1", id: 4, seq: 3, ts: now() + 2000 });
+  helper.emit({ type: "probe-result", target: "192.168.1.1", id: 4, seq: 3, ts: now() + 2003, outcome: "reply", rttMs: 4 });
+  expect(ctl.view().ping.gw).toBe(4);
+  await advance(12_000);
+  expect(ctl.view().ping.gw).toBeNull();
 });

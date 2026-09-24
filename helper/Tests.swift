@@ -117,6 +117,10 @@ func runWardenTests() -> Int32 {
   _ = w12.handle(.renew(id: 2, token: t12), now: 1000, awdlUp: false)
   check(w12.tick(now: 3001, awdlUp: false) == [.up], "renew extends by the lease's own ttl")
 
+  check(classifyReply(rttMs: 999, deadlineMs: 1000) == .reply, "reply before deadline is a reply")
+  check(classifyReply(rttMs: 1000, deadlineMs: 1000) == .lateAfterLoss, "reply at deadline is loss + late")
+  check(classifyReply(rttMs: 1400, deadlineMs: 1000) == .lateAfterLoss, "reply read after deadline is loss + late")
+
   print(failed ? "warden tests FAILED" : "warden tests ok")
   return failed ? 1 : 0
 }

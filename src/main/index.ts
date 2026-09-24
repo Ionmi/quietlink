@@ -4,6 +4,7 @@ import { homedir, userInfo } from "node:os";
 import { join, resolve } from "node:path";
 import { Controller } from "../app/controller";
 import { buildReport } from "../app/export";
+import { safeUninstall } from "../app/uninstall";
 import { startCliServer } from "../app/cli-server";
 import { HelperClient } from "../adapters/helper-client";
 import { WardenClient, wardenPid } from "../adapters/warden-client";
@@ -103,14 +104,18 @@ const api: Api = {
     if (r.ok) await ensureWarden();
     return r;
   },
-  uninstallPrivilege: async () => {
-    controller.emergency();
-    await warden.request({ op: "restore-now" }).catch(() => {});
-    await removeAgent(WARDEN_LABEL); // SIGTERM: the warden restores before exiting
-    const r = await privilege.uninstall();
-    controller.reenable();
-    return r;
-  },
+  uninstallPrivilege: () =>
+    safeUninstall({
+      suppress: () => controller.emergency(),
+      reenable: () => controller.reenable(),
+      restoreNow: async () => { await warden.request({ op: "restore-now" }); },
+      status: async () => {
+        const r = await warden.request({ op: "status" });
+        return r.ok && r.status ? r.status : null;
+      },
+      removeAgent: () => removeAgent(WARDEN_LABEL),
+      uninstallRule: () => privilege.uninstall(),
+    }),
   privilegeStatus: async () => ({ installed: await privilege.hasPrivilege(), wardenRunning: (await wardenPid(WARDEN_LABEL)) !== null }),
   listRunningApps: async () => controller.runningApps(),
   exportDiagnostics: async (includeIdentifiers) => {

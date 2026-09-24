@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TriggerRule } from "../../../domain/triggers";
+  import { ruleFromApp, type TriggerRule } from "../../../domain/triggers";
   import { app, call, tr } from "../../shared/state.svelte";
 
   const s = $derived(app.view!.settings);
@@ -28,15 +28,7 @@
   function add() {
     const a = apps.find((x) => x.path === chosen);
     if (!a) return;
-    const rule: TriggerRule = {
-      id: `custom:${crypto.randomUUID()}`,
-      label: a.name,
-      kind: "game",
-      match: scope === "app" ? { bundlePrefix: a.bundle } : { executable: a.path.slice(a.path.lastIndexOf(".app/") - a.name.length) },
-      enabled: true,
-      verified: true,
-    };
-    save([...s.rules, rule]);
+    save([...s.rules, ruleFromApp(a, scope, crypto.randomUUID())]);
     picking = false;
   }
 </script>

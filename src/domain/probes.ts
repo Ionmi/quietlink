@@ -98,6 +98,12 @@ export class ProbeLedger {
     };
   }
 
+  /** True while any probe sent within [from, to] still awaits its result. */
+  pendingIn(target: string, from: number, to: number): boolean {
+    for (const r of this.records(target).values()) if (r.outcome === "pending" && r.sentAt >= from && r.sentAt <= to) return true;
+    return false;
+  }
+
   /** Settled probes in send order for charts: rtt for replies, null for losses. */
   series(target: string, from: number, to: number): { t: number; rtt: number | null }[] {
     return [...this.records(target).values()]

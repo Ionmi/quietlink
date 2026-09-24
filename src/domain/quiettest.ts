@@ -10,6 +10,8 @@ export type QTState = {
   run: number;
   block: number;
   blockStart: number | null;
+  /** When the current arming phase began; arming that takes too long invalidates the run. */
+  armedAt: number | null;
   holdAcked: boolean;
   /** Latest AWDL observation during the current transition (null = none yet). */
   awdlUp: boolean | null;
@@ -37,7 +39,8 @@ export type QTEffect =
 
 export const TEST_PROBE_MS = 200;
 export const BLOCKS = 4;
-export const initialQT: QTState = { phase: "idle", run: 0, block: 0, blockStart: null, holdAcked: false, awdlUp: null, results: [], baseline: null };
+export const ARM_TIMEOUT_MS = 15_000;
+export const initialQT: QTState = { phase: "idle", run: 0, block: 0, blockStart: null, armedAt: null, holdAcked: false, awdlUp: null, results: [], baseline: null };
 
 type Out = { state: QTState; effects: QTEffect[] };
 const RUNNING: QTPhase[] = ["arming-A", "A", "arming-B", "B"];
@@ -58,7 +61,7 @@ export function qtReduce(s: QTState, i: QTInput, blockMs = 60_000): Out {
   if (i.kind === "start") {
     if (running) return none;
     if (i.activeLeases > 0 || i.inGrace) return { state: { ...initialQT, phase: "invalid", reason: "busy" }, effects: [] };
-    return { state: { ...initialQT, run: s.run + 1, phase: "arming-A", baseline: i.wifi }, effects: [{ kind: "set-probe-interval", ms: TEST_PROBE_MS }] };
+    return { state: { ...initialQT, run: s.run + 1, phase: "arming-A", armedAt: i.now, baseline: i.wifi }, effects: [{ kind: "set-probe-interval", ms: TEST_PROBE_MS }] };
   }
   if (i.kind === "block-stats") {
     if (i.run !== s.run || s.phase === "idle" || s.results.some((r) => r.block === i.block)) return none;
@@ -89,6 +92,8 @@ export function qtReduce(s: QTState, i: QTInput, blockMs = 60_000): Out {
       return none;
     case "tick": {
       if (s.baseline && !sameWifi(s.baseline, i.wifi)) return stop(s, "invalid", "test-release", "network-changed");
+      if ((s.phase === "arming-A" || s.phase === "arming-B") && s.armedAt !== null && i.now - s.armedAt > ARM_TIMEOUT_MS)
+        return stop(s, "invalid", "test-release", "timeout");
       if ((s.phase !== "A" && s.phase !== "B") || s.blockStart === null || i.now - s.blockStart < blockMs) return none;
       const collect: QTEffect = { kind: "collect-block", run: s.run, block: s.block, cond: condOf(s.block), from: s.blockStart, to: i.now };
       const next = s.block + 1;
@@ -98,7 +103,7 @@ export function qtReduce(s: QTState, i: QTInput, blockMs = 60_000): Out {
           effects: [collect, ...(s.phase === "B" ? [{ kind: "test-release" } as QTEffect] : []), { kind: "set-probe-interval", ms: null }],
         };
       }
-      const armed = { ...s, block: next, blockStart: null, holdAcked: false, awdlUp: null };
+      const armed = { ...s, block: next, blockStart: null, armedAt: i.now, holdAcked: false, awdlUp: null };
       if (condOf(next) === "B") return { state: { ...armed, phase: "arming-B" }, effects: [collect, { kind: "test-hold" }] };
       return { state: { ...armed, phase: "arming-A" }, effects: [collect, { kind: "test-release" }] };
     }

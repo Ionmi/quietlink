@@ -136,6 +136,9 @@ const en = {
   "ui.pauseShort": "Pause",
   "set.menuTraffic": "Show current download/upload in the menu bar",
   "ui.traffic": "Traffic",
+  "ui.restorePending": "Turning AirDrop back on…",
+  "ui.reconnectedOn": "Reconnected on {band} GHz",
+  "ui.reconnectTimeout": "Wi-Fi didn't come back within 20 s. Turn Wi-Fi on from the menu bar.",
 };
 
 export type Key = keyof typeof en;
@@ -276,6 +279,9 @@ const es: Record<Key, string> = {
   "ui.pauseShort": "Pausar",
   "set.menuTraffic": "Mostrar bajada/subida actual en la barra de menús",
   "ui.traffic": "Tráfico",
+  "ui.restorePending": "Volviendo a activar AirDrop…",
+  "ui.reconnectedOn": "Reconectado en {band} GHz",
+  "ui.reconnectTimeout": "El Wi-Fi no volvió en 20 s. Actívalo desde la barra de menús.",
 };
 
 export const strings: Record<Lang, Record<Key, string>> = { en, es };
