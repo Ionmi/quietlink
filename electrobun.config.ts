@@ -1,11 +1,14 @@
 import type { ElectrobunConfig } from "electrobun";
 
+// Hutch reads the version field; the SDK type only declares entrypoint.
+const bunRuntime = { entrypoint: "src/main/index.ts", version: "1.4.2" };
+
 export default {
   app: { name: "Quietlink", identifier: "dev.quietlink.app", version: "0.1.0" },
   runtime: { exitOnLastWindowClosed: false },
   build: {
     mainProcess: "bun",
-    bun: { entrypoint: "src/main/index.ts", version: "1.4.2" },
+    bun: bunRuntime,
     views: {
       popover: { entrypoint: "src/views/popover/bridge-entry.ts" },
       settings: { entrypoint: "src/views/settings/bridge-entry.ts" },
