@@ -88,3 +88,11 @@ test("instance lock is exclusive and releasable", () => {
   expect(b).not.toBeNull();
   b!.release();
 });
+
+test("a preset that becomes verified is enabled again even if it was stored disabled while untested", async () => {
+  const p = join(tmp(), "settings.json");
+  await Bun.write(p, JSON.stringify({ rules: [{ id: "lol", label: "old", kind: "game", match: {}, enabled: false, verified: false }] }));
+  expect(new SettingsStore(p).get().rules.find((r) => r.id === "lol")!.enabled).toBe(true);
+  await Bun.write(p, JSON.stringify({ rules: [{ id: "lol", label: "old", kind: "game", match: {}, enabled: false, verified: true }] }));
+  expect(new SettingsStore(p).get().rules.find((r) => r.id === "lol")!.enabled).toBe(false);
+});

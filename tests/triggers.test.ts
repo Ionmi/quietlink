@@ -4,7 +4,8 @@ import presets from "../src/shared/presets.json";
 
 const rules = loadPresets(presets).map((r) => ({ ...r, enabled: true }));
 const P = (pid: number, path: string, bundleId: string | null = null) => ({ pid, start: 100, path, bundleId });
-const game = "/Applications/League of Legends.app/Contents/LoL/Game/League of Legends.app/Contents/MacOS/League of Legends";
+// Real layout of the installed game (checked on macOS 27).
+const game = "/Applications/League of Legends.app/Contents/LoL/Game/LeagueofLegends.app/Contents/MacOS/LeagueofLegends";
 
 test("league match triggers", () => {
   expect(matchRules(rules, [P(1, game)], null).map((m) => m.ruleId)).toEqual(["lol"]);
@@ -14,7 +15,8 @@ test("league client alone does not trigger", () => {
   expect(
     matchRules(rules, [
       P(2, "/Applications/League of Legends.app/Contents/LoL/LeagueClient.app/Contents/MacOS/LeagueClient"),
-      P(3, "/Applications/League of Legends.app/Contents/LoL/LeagueClient.app/Contents/Frameworks/LeagueClientUx.app/Contents/MacOS/LeagueClientUx"),
+      P(3, "/Applications/League of Legends.app/Contents/LoL/League of Legends.app/Contents/MacOS/LeagueClientUx"),
+      P(5, "/Applications/League of Legends.app/Contents/LoL/Game/LeagueofLegends.app/Contents/MacOS/LeagueCrashHandler"),
       P(4, "/Users/x/Applications/Riot Client.app/Contents/MacOS/Riot Client"),
     ], null),
   ).toEqual([]);

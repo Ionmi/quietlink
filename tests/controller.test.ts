@@ -7,7 +7,7 @@ import { SettingsStore } from "../src/adapters/settings-store";
 import { TelemetryStore } from "../src/adapters/telemetry-store";
 import type { HelperCommand, HelperEvent, WardenResponse, WardenStatus } from "../src/shared/protocol";
 
-const LOL = "/Applications/League of Legends.app/Contents/LoL/Game/League of Legends.app/Contents/MacOS/League of Legends";
+const LOL = "/Applications/League of Legends.app/Contents/LoL/Game/LeagueofLegends.app/Contents/MacOS/LeagueofLegends";
 
 class FakeHelper implements HelperLike {
   sent: HelperCommand[] = [];

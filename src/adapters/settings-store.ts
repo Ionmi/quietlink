@@ -31,7 +31,12 @@ export function defaults(lang: Lang = "en"): Settings {
 function mergeRules(stored: TriggerRule[] | undefined): TriggerRule[] {
   const shipped = loadPresets(presets);
   const byId = new Map((stored ?? []).map((r) => [r.id, r]));
-  const merged = shipped.map((p) => (byId.has(p.id) ? { ...p, enabled: !!byId.get(p.id)!.enabled } : p));
+  // A stored "disabled" only counts as the user's choice if the preset was already verified then.
+  const merged = shipped.map((p) => {
+    const st = byId.get(p.id);
+    if (!st || (p.verified && st.verified === false)) return p;
+    return { ...p, enabled: !!st.enabled };
+  });
   const custom = (stored ?? []).filter((r) => r.id.startsWith("custom:") && r.match && typeof r.label === "string");
   return [...merged, ...custom];
 }

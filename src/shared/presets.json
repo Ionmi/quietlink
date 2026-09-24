@@ -2,8 +2,8 @@
   "version": 1,
   "rules": [
     { "id": "lol", "label": "League of Legends (match)", "kind": "game",
-      "match": { "executable": "League of Legends.app/Contents/MacOS/League of Legends" },
-      "exclude": ["LeagueClient", "LeagueClientUx", "Riot Client"], "enabled": true, "verified": false },
+      "match": { "executable": "Game/LeagueofLegends.app/Contents/MacOS/LeagueofLegends" },
+      "exclude": ["LeagueClient", "LeagueClientUx", "LeagueCrashHandler", "Riot Client"], "enabled": true, "verified": true },
     { "id": "zoom-meeting", "label": "Zoom meeting", "kind": "call",
       "match": { "executable": "CptHost.app/Contents/MacOS/CptHost" }, "enabled": true, "verified": false },
     { "id": "facetime", "label": "FaceTime (with microphone)", "kind": "call",

@@ -29,3 +29,10 @@ all checks passed
 
 No measurable difference on this run: with the Mac on 6 GHz, AWDL caused no spikes during the test
 (the earlier 77-spike baseline was measured on 5 GHz channel 40). Repeat when spikes are observed.
+
+## League of Legends detection (2026-09-24)
+
+- Installed layout: match = `LoL/Game/LeagueofLegends.app/Contents/MacOS/LeagueofLegends`, client = `LoL/League of Legends.app/Contents/MacOS/LeagueClientUx`, launcher = `LoL/LeagueClient.app/…/LeagueClient`.
+- A stand-in binary at the match path: quiet mode on in < 7 s (process snapshot every 2 s), AWDL down; after it exits, grace 10 s, then AWDL up.
+- A stand-in at the client path: no trigger.
+- Pending: confirm with a real match.

@@ -54,7 +54,7 @@
 </div>
 
 <style>
-  .layout { display: grid; grid-template-columns: 200px 1fr; height: 100vh; }
+  .layout { display: grid; grid-template-columns: 200px 1fr; grid-template-rows: 100vh; height: 100vh; }
   nav { background: var(--side); border-right: 1px solid var(--hair); padding: 44px 10px 10px; display: flex; flex-direction: column; gap: 2px; -webkit-app-region: drag; }
   nav > * { -webkit-app-region: no-drag; }
   .brand { display: flex; align-items: center; gap: 8px; padding: 0 10px 16px; font: 600 15px ui-rounded, "SF Pro Rounded", -apple-system, sans-serif; }
@@ -64,7 +64,7 @@
   nav button.active { background: var(--teal); color: #fff; }
   nav button.active svg { color: #fff; }
   nav button:focus-visible:not(.active) { outline: 2px solid var(--mint); outline-offset: 1px; }
-  main { display: flex; flex-direction: column; min-width: 0; }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
   .drag { height: 38px; flex: none; -webkit-app-region: drag; }
-  .content { flex: 1; overflow-y: auto; padding: 0 32px 32px; }
+  .content { flex: 1; min-height: 0; overflow-y: auto; padding: 0 32px 32px; }
 </style>
